@@ -35,7 +35,7 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "binaries/cloudflared"
+      "binaries/porthop-cloudflared"
     ],
     "category": "DeveloperTool",
     "publisher": "Mayank Jonwal",

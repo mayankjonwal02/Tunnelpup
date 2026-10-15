@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 // Downloads the official cloudflared binary into src-tauri/binaries/ with the
-// file name Tauri's sidecar system expects: cloudflared-<rust-target-triple>[.exe]
+// file name Tauri's sidecar system expects: porthop-cloudflared-<rust-target-triple>[.exe]
+//
+// It's renamed so it can't clash with a cloudflared the user installed themselves: Linux
+// packages put bundled binaries in /usr/bin, where Cloudflare's package installs cloudflared.
 //
 // Usage:
 //   node scripts/fetch-cloudflared.mjs            # host platform only
@@ -74,7 +77,7 @@ async function fetchTarget(triple, sums) {
   if (!asset) throw new Error(`Unsupported target: ${triple}. Supported: ${Object.keys(ASSETS).join(", ")}`);
 
   const isWindows = triple.includes("windows");
-  const dest = join(OUT_DIR, `cloudflared-${triple}${isWindows ? ".exe" : ""}`);
+  const dest = join(OUT_DIR, `porthop-cloudflared-${triple}${isWindows ? ".exe" : ""}`);
   const stamp = `${dest}.version`;
   if (existsSync(dest) && existsSync(stamp) && readFileSync(stamp, "utf8").trim() === CLOUDFLARED_VERSION) {
     console.log(`✓ ${triple}: already at ${CLOUDFLARED_VERSION}`);

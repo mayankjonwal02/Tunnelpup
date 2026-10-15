@@ -9,7 +9,7 @@ Windows releases of PortHop are built from this repository by GitHub Actions ([`
 - `porthop.exe`, the PortHop application
 - the installers: `PortHop_<version>_x64-setup.exe` and `PortHop_<version>_x64_en-US.msi`
 
-PortHop also ships `cloudflared.exe`, Cloudflare's tunnel connector. It is not built or signed by this project; it carries Cloudflare's own signature (Cloudflare, Inc.) and is included unmodified.
+PortHop also ships Cloudflare's tunnel connector, cloudflared, as `porthop-cloudflared.exe`; the file is renamed so it can't clash with a copy of cloudflared you installed yourself. It is not built or signed by this project: it carries Cloudflare's own signature (Cloudflare, Inc.) and is otherwise unmodified.
 
 ## Team roles
 

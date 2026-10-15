@@ -78,7 +78,7 @@ function Setup({ onDone }: { onDone: () => void }) {
 
   return (
     <main className="setup">
-      <h1 className="brand">PortHop</h1>
+      <h1 className="brand"><img src="/logo.svg" alt="" className="logo" />PortHop</h1>
       <p className="lede">
         Put localhost:3000 on app.yourdomain.com, through Cloudflare.{" "}
         <a href="#" onClick={(e) => (e.preventDefault(), setGuide(true))}>New here? Read the guide</a>
@@ -217,7 +217,7 @@ function Dashboard({ snap, refresh }: { snap: Snapshot; refresh: () => void }) {
     <main className="app">
       <header className="top">
         <div>
-          <h1 className="brand">PortHop</h1>
+          <h1 className="brand"><img src="/logo.svg" alt="" className="logo" />PortHop</h1>
           <span className="muted small">{config.accountName}{config.tunnel && ` · ${config.tunnel.name}`}</span>
         </div>
         <div className="row">

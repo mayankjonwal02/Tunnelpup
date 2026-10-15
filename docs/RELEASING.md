@@ -67,4 +67,4 @@ The repository already meets the requirements: an OSI licence ([MIT](../LICENSE)
 
 From the next release on, the Windows job builds `porthop.exe`, has SignPath sign it, packages the installers around the signed exe, has SignPath sign the installers, checks the signatures and attaches them. Each release waits (up to an hour) for you to approve the two signing requests in SignPath.
 
-`cloudflared.exe` is never re-signed: it's Cloudflare's binary and already carries Cloudflare's signature.
+`porthop-cloudflared.exe` is never re-signed: it's Cloudflare's cloudflared, only renamed, and already carries Cloudflare's signature.

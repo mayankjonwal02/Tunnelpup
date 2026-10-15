@@ -5,6 +5,7 @@ mod connector;
 mod doh;
 mod error;
 mod freedomain;
+mod guard;
 mod ports;
 mod secrets;
 mod tray;
@@ -35,6 +36,8 @@ pub fn run() {
         .manage(RouteLock(tokio::sync::Mutex::new(())))
         .setup(|app| {
             let handle = app.handle().clone();
+            // A connector left behind by a PortHop that crashed or was killed.
+            guard::kill_leftover(&handle);
             let cfg = config::load(&handle);
             app.manage(ConfigState(Mutex::new(cfg.clone())));
             tray::create(app)?;

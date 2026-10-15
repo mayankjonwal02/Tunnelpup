@@ -11,6 +11,7 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
 use crate::error::{AppError, AppResult};
+use crate::guard;
 
 const MAX_LOG_LINES: usize = 300;
 pub const STATUS_EVENT: &str = "connector-status";
@@ -73,7 +74,7 @@ impl Connector {
     /// Start (or restart) cloudflared with the given connector token.
     pub fn start(&self, app: &AppHandle, token: String) -> AppResult<()> {
         // Fail fast if the sidecar binary is missing, before touching state.
-        app.shell().sidecar("cloudflared").map_err(|e| AppError::Connector(e.to_string()))?;
+        app.shell().sidecar(guard::SIDECAR).map_err(|e| AppError::Connector(e.to_string()))?;
 
         let generation = {
             let mut inner = self.inner.lock().unwrap();
@@ -98,6 +99,7 @@ impl Connector {
                 let _ = child.kill();
             }
         }
+        guard::forget(app);
         set_status(app, ConnectorStatus::Stopped);
     }
 
@@ -111,7 +113,7 @@ async fn supervise(app: AppHandle, token: String, generation: u64) {
     let mut backoff = 2u64;
 
     while connector.is_current(generation) {
-        let spawned = app.shell().sidecar("cloudflared").and_then(|cmd| {
+        let spawned = app.shell().sidecar(guard::SIDECAR).and_then(|cmd| {
             cmd.args(["tunnel", "--no-autoupdate", "run"])
                 // Passing the token via env keeps it out of the process list and off disk.
                 .env("TUNNEL_TOKEN", &token)
@@ -126,6 +128,9 @@ async fn supervise(app: AppHandle, token: String, generation: u64) {
                 continue;
             }
         };
+        // However PortHop ends, the connector must end with it.
+        guard::tie_to_app(child.pid());
+        guard::remember(&app, child.pid());
 
         {
             let mut inner = connector.inner.lock().unwrap();
