@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 
 export type ThemeChoice = "system" | "light" | "dark";
 
-const KEY = "porthop.theme";
+const KEY = "tunnelpup.theme";
 
 export function loadTheme(): ThemeChoice {
   try {

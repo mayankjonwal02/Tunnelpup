@@ -1,12 +1,12 @@
-//! Keeps PortHop's connector from outliving PortHop.
+//! Keeps TunnelPup's connector from outliving TunnelPup.
 //!
-//! If PortHop is killed rather than quit (a crash, Task Manager, `tauri dev` restarting it),
-//! the connector would keep running on its own: the user's sites stay online with PortHop
+//! If TunnelPup is killed rather than quit (a crash, Task Manager, `tauri dev` restarting it),
+//! the connector would keep running on its own: the user's sites stay online with TunnelPup
 //! gone, and the running binary can't be replaced by an upgrade or a rebuild.
 //!
-//! - Windows: the connector joins a job object that the OS ends together with PortHop,
-//!   however PortHop exits.
-//! - Everywhere: the connector's PID is recorded while it runs. If PortHop didn't shut down
+//! - Windows: the connector joins a job object that the OS ends together with TunnelPup,
+//!   however TunnelPup exits.
+//! - Everywhere: the connector's PID is recorded while it runs. If TunnelPup didn't shut down
 //!   cleanly, the next start ends the leftover connector.
 
 use std::path::{Path, PathBuf};
@@ -15,15 +15,15 @@ use tauri::{AppHandle, Manager};
 
 /// The bundled connector's name (`externalBin` in tauri.conf.json). It isn't plain
 /// "cloudflared" so it can't clash with a cloudflared the user installed themselves.
-pub const SIDECAR: &str = "porthop-cloudflared";
+pub const SIDECAR: &str = "tunnelpup-cloudflared";
 const PID_FILE: &str = "connector.pid";
 
-/// Have the OS end process `pid` when PortHop exits. Windows only; elsewhere `kill_leftover` covers it.
+/// Have the OS end process `pid` when TunnelPup exits. Windows only; elsewhere `kill_leftover` covers it.
 pub fn tie_to_app(pid: u32) {
     #[cfg(windows)]
     {
         use std::sync::OnceLock;
-        // Never closed by PortHop itself: the OS closes it when PortHop's process ends.
+        // Never closed by TunnelPup itself: the OS closes it when TunnelPup's process ends.
         static JOB: OnceLock<Option<win::KillOnClose>> = OnceLock::new();
         if let Some(job) = JOB.get_or_init(win::KillOnClose::new) {
             job.add(pid);
@@ -33,7 +33,7 @@ pub fn tie_to_app(pid: u32) {
     let _ = pid;
 }
 
-/// Record the running connector, so a later start can end it if PortHop dies.
+/// Record the running connector, so a later start can end it if TunnelPup dies.
 pub fn remember(app: &AppHandle, pid: u32) {
     if let Some(path) = pid_file(app) {
         if let Some(dir) = path.parent() {
@@ -50,7 +50,7 @@ pub fn forget(app: &AppHandle) {
     }
 }
 
-/// End a connector left running by an earlier PortHop that didn't shut down cleanly.
+/// End a connector left running by an earlier TunnelPup that didn't shut down cleanly.
 pub fn kill_leftover(app: &AppHandle) {
     let Some(path) = pid_file(app) else { return };
     let Ok(text) = std::fs::read_to_string(&path) else { return };
@@ -66,7 +66,7 @@ fn pid_file(app: &AppHandle) -> Option<PathBuf> {
     app.path().app_data_dir().ok().map(|dir| dir.join(PID_FILE))
 }
 
-/// True if `exe` is PortHop's connector, `porthop-cloudflared[.exe]`.
+/// True if `exe` is TunnelPup's connector, `tunnelpup-cloudflared[.exe]`.
 fn is_connector(exe: &Path) -> bool {
     exe.file_stem().and_then(|s| s.to_str()).is_some_and(|s| s.eq_ignore_ascii_case(SIDECAR))
 }
@@ -232,11 +232,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn recognises_only_porthops_connector() {
-        for yes in ["porthop-cloudflared.exe", "C:/Program Files/PortHop/porthop-cloudflared.exe", "/usr/bin/porthop-cloudflared"] {
+    fn recognises_only_tunnelpups_connector() {
+        for yes in ["tunnelpup-cloudflared.exe", "C:/Program Files/TunnelPup/tunnelpup-cloudflared.exe", "/usr/bin/tunnelpup-cloudflared"] {
             assert!(is_connector(Path::new(yes)), "{yes}");
         }
-        for no in ["cloudflared.exe", "/usr/bin/cloudflared", "porthop.exe", "porthop-cloudflared-helper"] {
+        for no in ["cloudflared.exe", "/usr/bin/cloudflared", "tunnelpup.exe", "tunnelpup-cloudflared-helper"] {
             assert!(!is_connector(Path::new(no)), "{no}");
         }
     }

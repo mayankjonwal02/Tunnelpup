@@ -6,6 +6,7 @@ mod doh;
 mod error;
 mod freedomain;
 mod guard;
+mod migrate;
 mod ports;
 mod secrets;
 mod tray;
@@ -36,7 +37,9 @@ pub fn run() {
         .manage(RouteLock(tokio::sync::Mutex::new(())))
         .setup(|app| {
             let handle = app.handle().clone();
-            // A connector left behind by a PortHop that crashed or was killed.
+            // First start after the rename from PortHop: take over its settings and token.
+            migrate::from_porthop(&handle);
+            // A connector left behind by a TunnelPup that crashed or was killed.
             guard::kill_leftover(&handle);
             let cfg = config::load(&handle);
             app.manage(ConfigState(Mutex::new(cfg.clone())));
@@ -58,14 +61,14 @@ pub fn run() {
                         Ok(t) => {
                             let _ = handle.state::<Connector>().start(&handle, t);
                         }
-                        Err(e) => eprintln!("[porthop] could not auto-start tunnel: {e}"),
+                        Err(e) => eprintln!("[tunnelpup] could not auto-start tunnel: {e}"),
                     }
                 });
             }
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Closing the window keeps PortHop running in the tray.
+            // Closing the window keeps TunnelPup running in the tray.
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let _ = window.hide();
                 api.prevent_close();
@@ -92,7 +95,7 @@ pub fn run() {
             commands::check_ports,
         ])
         .build(tauri::generate_context!())
-        .expect("error while building PortHop");
+        .expect("error while building TunnelPup");
 
     app.run(|app, event| match event {
         // Never leave an orphaned cloudflared behind.

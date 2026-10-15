@@ -1,4 +1,4 @@
-//! Thin client for the Cloudflare v4 API endpoints PortHop needs.
+//! Thin client for the Cloudflare v4 API endpoints TunnelPup needs.
 //! Field names follow https://developers.cloudflare.com/api/ — re-check them
 //! against the docs if a call starts failing after a Cloudflare change.
 
@@ -91,7 +91,7 @@ pub struct OriginRequest {
 impl Cloudflare {
     pub fn new(token: impl Into<String>) -> AppResult<Self> {
         let http = reqwest::Client::builder()
-            .user_agent(concat!("PortHop/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("TunnelPup/", env!("CARGO_PKG_VERSION")))
             .timeout(std::time::Duration::from_secs(30))
             .build()?;
         Ok(Self { http, token: token.into() })
@@ -228,7 +228,7 @@ impl Cloudflare {
             "name": hostname,
             "content": format!("{tunnel_id}.cfargotunnel.com"),
             "proxied": true,
-            "comment": "Managed by PortHop",
+            "comment": "Managed by TunnelPup",
         });
         match self.find_dns_record(zone_id, hostname).await? {
             Some(existing) if existing.record_type == "CNAME" => {

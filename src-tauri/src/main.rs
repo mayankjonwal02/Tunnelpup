@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    porthop_lib::run()
+    tunnelpup_lib::run()
 }

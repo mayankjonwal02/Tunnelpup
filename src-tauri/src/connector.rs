@@ -123,12 +123,12 @@ async fn supervise(app: AppHandle, token: String, generation: u64) {
         let (mut rx, child) = match spawned {
             Ok(v) => v,
             Err(e) => {
-                push_log(&app, format!("[porthop] failed to start cloudflared: {e}"));
+                push_log(&app, format!("[tunnelpup] failed to start cloudflared: {e}"));
                 wait_and_retry(&app, generation, &mut backoff, e.to_string()).await;
                 continue;
             }
         };
-        // However PortHop ends, the connector must end with it.
+        // However TunnelPup ends, the connector must end with it.
         guard::tie_to_app(child.pid());
         guard::remember(&app, child.pid());
 
@@ -167,7 +167,7 @@ async fn supervise(app: AppHandle, token: String, generation: u64) {
                     }
                     push_log(&app, line);
                 }
-                CommandEvent::Error(e) => push_log(&app, format!("[porthop] {e}")),
+                CommandEvent::Error(e) => push_log(&app, format!("[tunnelpup] {e}")),
                 CommandEvent::Terminated(p) => {
                     exit_reason = match p.code {
                         Some(code) => format!("cloudflared exited with code {code}"),
@@ -183,7 +183,7 @@ async fn supervise(app: AppHandle, token: String, generation: u64) {
         if !connector.is_current(generation) {
             return; // stopped or restarted on purpose
         }
-        push_log(&app, format!("[porthop] {exit_reason}"));
+        push_log(&app, format!("[tunnelpup] {exit_reason}"));
         wait_and_retry(&app, generation, &mut backoff, exit_reason).await;
     }
 }

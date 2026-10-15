@@ -122,7 +122,7 @@ mod tests {
         tauri::async_runtime::block_on(async {
             assert_eq!(check("dataai.dpdns.org").await, Availability::Taken);
             for s in SUFFIXES {
-                assert_eq!(check(&format!("porthop-test-unregistered-7q.{s}")).await, Availability::Available, "{s}");
+                assert_eq!(check(&format!("tunnelpup-test-unregistered-7q.{s}")).await, Availability::Available, "{s}");
             }
         });
     }

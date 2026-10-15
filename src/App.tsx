@@ -31,7 +31,7 @@ const TOKEN_PERMISSIONS = [
 ];
 const TOKEN_URL =
   "https://dash.cloudflare.com/profile/api-tokens" +
-  `?permissionGroupKeys=${encodeURIComponent(JSON.stringify(TOKEN_PERMISSIONS))}&accountId=*&zoneId=all&name=PortHop`;
+  `?permissionGroupKeys=${encodeURIComponent(JSON.stringify(TOKEN_PERMISSIONS))}&accountId=*&zoneId=all&name=TunnelPup`;
 
 type Run = (fn: () => Promise<unknown>, onError?: (message: string) => void) => void;
 
@@ -78,7 +78,7 @@ function Setup({ onDone }: { onDone: () => void }) {
 
   return (
     <main className="setup">
-      <h1 className="brand"><img src="/logo.svg" alt="" className="logo" />PortHop</h1>
+      <h1 className="brand"><img src="/logo.svg" alt="" className="logo" />TunnelPup</h1>
       <p className="lede">
         Put localhost:3000 on app.yourdomain.com, through Cloudflare.{" "}
         <a href="#" onClick={(e) => (e.preventDefault(), setGuide(true))}>New here? Read the guide</a>
@@ -112,7 +112,7 @@ function Setup({ onDone }: { onDone: () => void }) {
             <li><code>Account · Cloudflare Tunnel · Edit</code> — create and run this computer's tunnel</li>
             <li><code>Account · Account Settings · Read</code> — find your Cloudflare account</li>
             <li><code>Zone · DNS · Edit</code> — point your subdomains at the tunnel</li>
-            <li><code>Zone · Zone · Edit</code> — add domains from PortHop, including free ones</li>
+            <li><code>Zone · Zone · Edit</code> — add domains from TunnelPup, including free ones</li>
           </ul>
         </details>
         <p className="muted small">The token is stored in your system keychain, never in a file.</p>
@@ -217,7 +217,7 @@ function Dashboard({ snap, refresh }: { snap: Snapshot; refresh: () => void }) {
     <main className="app">
       <header className="top">
         <div>
-          <h1 className="brand"><img src="/logo.svg" alt="" className="logo" />PortHop</h1>
+          <h1 className="brand"><img src="/logo.svg" alt="" className="logo" />TunnelPup</h1>
           <span className="muted small">{config.accountName}{config.tunnel && ` · ${config.tunnel.name}`}</span>
         </div>
         <div className="row">
@@ -245,7 +245,7 @@ function Dashboard({ snap, refresh }: { snap: Snapshot; refresh: () => void }) {
       )}
       {connector.state === "reconnecting" && (
         <div className="banner banner-warn">
-          <span>The tunnel dropped ({connector.reason}). PortHop retries in {connector.retry_in_secs}s.</span>
+          <span>The tunnel dropped ({connector.reason}). TunnelPup retries in {connector.retry_in_secs}s.</span>
           <button className="small ghost" onClick={() => setPanel("logs")}>View logs</button>
           <button className="small ghost" onClick={() => openGuide("troubleshooting")}>Help</button>
         </div>
@@ -412,7 +412,7 @@ function Routes({ routes, down, offline, run, busy }: {
                 </span>
               )}
               {r.rewriteHost && (
-                <span className="tag" title="This app only answers requests addressed to localhost, so PortHop has the tunnel send it Host: localhost.">
+                <span className="tag" title="This app only answers requests addressed to localhost, so TunnelPup has the tunnel send it Host: localhost.">
                   Host: localhost
                 </span>
               )}
@@ -556,13 +556,13 @@ function Drawer({ title, onClose, wide, children }: { title: string; onClose: ()
   );
 }
 
-type LogLevel = "debug" | "info" | "warn" | "error" | "porthop" | "plain";
+type LogLevel = "debug" | "info" | "warn" | "error" | "tunnelpup" | "plain";
 type LogEntry = { raw: string; body: string; time: string | null; level: LogLevel; message: string; fields: [string, string][] };
 type LogGroup = LogEntry & { count: number };
 
 const LOG_LEVELS: Record<string, LogLevel> = { DBG: "debug", INF: "info", WRN: "warn", ERR: "error", FTL: "error" };
-// PortHop's own lines are about the connector failing or exiting, so they count as warnings.
-const LOG_RANK: Record<LogLevel, number> = { debug: 0, info: 1, plain: 1, warn: 2, porthop: 2, error: 3 };
+// TunnelPup's own lines are about the connector failing or exiting, so they count as warnings.
+const LOG_RANK: Record<LogLevel, number> = { debug: 0, info: 1, plain: 1, warn: 2, tunnelpup: 2, error: 3 };
 const LOG_HEAD = /^(\d{4}-\d\d-\d\dT[\d:.]+Z) (DBG|INF|WRN|ERR|FTL) /;
 const LOG_FIELD = /\s([A-Za-z_][\w.-]*)=("(?:[^"\\]|\\.)*"|\S*)/g;
 
@@ -573,9 +573,9 @@ const unquote = (v: string) => {
 
 /** Split a cloudflared line (`<time> <LVL> message key=value …`) into its parts. */
 function parseLog(raw: string): LogEntry {
-  if (raw.startsWith("[porthop]")) {
-    const message = raw.slice("[porthop]".length).trim();
-    return { raw, body: raw, time: null, level: "porthop", message, fields: [] };
+  if (raw.startsWith("[tunnelpup]")) {
+    const message = raw.slice("[tunnelpup]".length).trim();
+    return { raw, body: raw, time: null, level: "tunnelpup", message, fields: [] };
   }
   const head = LOG_HEAD.exec(raw);
   if (!head) return { raw, body: raw, time: null, level: "plain", message: raw, fields: [] };
@@ -665,7 +665,7 @@ function Logs({ onClose }: { onClose: () => void }) {
         {!follow && <button className="jump small" onClick={() => setFollow(true)}>↓ Latest</button>}
       </div>
       <p className="muted small">
-        {shown.length === entries.length ? `${entries.length} lines` : `${shown.length} of ${entries.length} lines`} · PortHop keeps the last 300
+        {shown.length === entries.length ? `${entries.length} lines` : `${shown.length} of ${entries.length} lines`} · TunnelPup keeps the last 300
       </p>
     </Drawer>
   );
@@ -818,7 +818,7 @@ function Domains({ zones, certs, accountId, accountName, initialMode = "own", on
                     <button className="small" disabled={checking === z.id} onClick={() => checkCertNow(z)}>
                       {checking === z.id ? "Checking…" : "Check now"}
                     </button>
-                    <span className="muted small">Usually 15 minutes to a few hours. PortHop checks every 30 seconds.</span>
+                    <span className="muted small">Usually 15 minutes to a few hours. TunnelPup checks every 30 seconds.</span>
                   </div>
                 </div>
               )}
@@ -845,7 +845,7 @@ function Domains({ zones, certs, accountId, accountName, initialMode = "own", on
                     <button className="small" disabled={checking === z.id} onClick={() => checkNow(z)}>
                       {checking === z.id ? "Checking…" : "Check now"}
                     </button>
-                    <span className="muted small">PortHop re-checks every 30 seconds. Nameserver changes can take a few hours.</span>
+                    <span className="muted small">TunnelPup re-checks every 30 seconds. Nameserver changes can take a few hours.</span>
                   </div>
                 </div>
               )}
@@ -1040,7 +1040,7 @@ function FreeDomain({ zones, certs, onChanged, onCheckCert, onUseOwn }: {
               ) : (
                 <>
                   In the <a href="#" onClick={(e) => (e.preventDefault(), openUrl(DIGITALPLAT_URL))}>DigitalPlat dashboard</a> → Domain List → {name},
-                  enter the two nameservers from step 2. PortHop checks every 30 seconds; it usually takes a few minutes.
+                  enter the two nameservers from step 2. TunnelPup checks every 30 seconds; it usually takes a few minutes.
                 </>
               )}
             </p>
@@ -1054,7 +1054,7 @@ function FreeDomain({ zones, certs, onChanged, onCheckCert, onUseOwn }: {
               {ready
                 ? "Pick it when you add a route."
                 : active
-                  ? "Usually 15 minutes to a few hours after the nameservers are set. PortHop checks every 30 seconds."
+                  ? "Usually 15 minutes to a few hours after the nameservers are set. TunnelPup checks every 30 seconds."
                   : "Starts once the nameservers are set."}
             </p>
           </li>
@@ -1113,7 +1113,7 @@ function Settings({ snap, onClose, onSignedOut }: { snap: Snapshot; onClose: () 
           </div>
           <p className="muted small">System follows your computer's light or dark setting.</p>
         </div>
-        <label className="toggle"><input type="checkbox" checked={autostart} onChange={toggleAutostart} /> Start PortHop when I log in</label>
+        <label className="toggle"><input type="checkbox" checked={autostart} onChange={toggleAutostart} /> Start TunnelPup when I log in</label>
         {snap.updatesConfigured && (
           <div className="row"><button onClick={update}>Check for updates</button>{updateMsg && <span className="muted small">{updateMsg}</span>}</div>
         )}

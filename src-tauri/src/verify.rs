@@ -1,4 +1,4 @@
-//! Confirms a new route works end to end before PortHop shows it: the hostname
+//! Confirms a new route works end to end before TunnelPup shows it: the hostname
 //! resolves on public DNS and an HTTPS request through Cloudflare reaches the
 //! local app. Lookups go over DNS-over-HTTPS so they never touch the system
 //! resolver; a "not found" cached by the router would hide the new record for
@@ -52,7 +52,7 @@ async fn check(hostname: &str, port: u16) -> Result<(), String> {
     })?;
     // Any answer from the app counts, even a 404 or a login redirect. These are Cloudflare's own errors.
     match res.status().as_u16() {
-        530 => Err("Cloudflare can't reach the PortHop connector".into()),
+        530 => Err("Cloudflare can't reach the TunnelPup connector".into()),
         502 | 504 => Err(format!("the tunnel couldn't reach localhost:{port}")),
         _ => Ok(()),
     }
@@ -95,7 +95,7 @@ pub async fn certificate(zone: &str) -> CertStatus {
     // cloudflare.com's and ask for a made-up name under the zone. That needs no DNS
     // record in the zone, and the zone's certificate covers *.zone.
     let Some(ip) = doh::first_ipv4("cloudflare.com").await else { return CertStatus::Unknown };
-    let host = format!("porthop-cert-check.{zone}");
+    let host = format!("tunnelpup-cert-check.{zone}");
     let Ok(client) = reqwest::Client::builder()
         .resolve(&host, SocketAddr::new(ip, 443))
         .redirect(reqwest::redirect::Policy::none())
@@ -171,7 +171,7 @@ mod tests {
         tauri::async_runtime::block_on(async {
             assert_eq!(certificate("dataai.dpdns.org").await, CertStatus::Ready);
             // A DigitalPlat name that isn't on Cloudflare at all, so it has no certificate there.
-            assert_eq!(certificate("porthop-not-a-zone-7q.dpdns.org").await, CertStatus::Pending);
+            assert_eq!(certificate("tunnelpup-not-a-zone-7q.dpdns.org").await, CertStatus::Pending);
         });
     }
 }

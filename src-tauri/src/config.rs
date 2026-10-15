@@ -41,10 +41,12 @@ pub struct Route {
     pub rewrite_host: bool,
 }
 
+pub const FILE: &str = "config.json";
+
 fn path(app: &AppHandle) -> AppResult<PathBuf> {
     let dir = app.path().app_config_dir()?;
     std::fs::create_dir_all(&dir)?;
-    Ok(dir.join("config.json"))
+    Ok(dir.join(FILE))
 }
 
 pub fn load(app: &AppHandle) -> AppConfig {

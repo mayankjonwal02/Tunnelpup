@@ -173,7 +173,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1
 .log-row.lvl-warn .lvl { color: var(--warn); }
 .log-row.lvl-error { background: color-mix(in srgb, var(--danger) 9%, transparent); }
 .log-row.lvl-error .lvl, .log-row.lvl-error .msg { color: var(--danger); }
-.log-row.lvl-porthop .lvl { color: var(--accent); }
+.log-row.lvl-tunnelpup .lvl { color: var(--accent); }
 .msg { white-space: pre-wrap; overflow-wrap: anywhere; }
 .kv { color: var(--muted); }
 .kv .k { opacity: 0.7; }

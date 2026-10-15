@@ -1,4 +1,4 @@
-# Builds PortHop's installers for Windows, macOS and Linux and attaches them to a draft
+# Builds TunnelPup's installers for Windows, macOS and Linux and attaches them to a draft
 # GitHub release. Each system has to build its own installers, so there's one job per system.
 #
 # Run it from the Actions tab ("Release" → "Run workflow"), or push a version tag:
@@ -20,6 +20,11 @@ permissions:
   contents: write
   actions: read
 
+# Runs take turns, since each one replaces the draft the one before it uploaded into.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   create-release:
     name: Create draft release
@@ -29,8 +34,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # One draft for all jobs to upload into; a re-run reuses it instead of making another,
-      # and moves it to the commit being built, since publishing tags the draft's commit.
+      # One draft for all jobs to upload into. Each run starts it over, so it holds only this
+      # run's commit, notes and installers; re-running just the failed jobs keeps it.
       - id: release
         uses: actions/github-script@v7
         with:
@@ -40,18 +45,11 @@ jobs:
             const tag = `v${version}`;
             const releases = await github.paginate(github.rest.repos.listReleases, context.repo);
             const existing = releases.find((r) => r.tag_name === tag);
-            if (existing) {
-              if (!existing.draft) {
-                core.setFailed(`${tag} is already published; bump the version first.`);
-              } else if (existing.target_commitish !== context.sha) {
-                await github.rest.repos.updateRelease({
-                  ...context.repo,
-                  release_id: existing.id,
-                  target_commitish: context.sha,
-                });
-              }
-              return existing.id;
+            if (existing && !existing.draft) {
+              core.setFailed(`${tag} is already published; bump the version first.`);
+              return;
             }
+            if (existing) await github.rest.repos.deleteRelease({ ...context.repo, release_id: existing.id });
             const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
             const body = fs.readFileSync('.github/release-notes.md', 'utf8')
               .replaceAll('{version}', version)
@@ -60,7 +58,7 @@ jobs:
               ...context.repo,
               tag_name: tag,
               target_commitish: context.sha,
-              name: `PortHop ${tag}`,
+              name: `TunnelPup ${tag}`,
               body,
               draft: true,
             });
@@ -131,21 +129,21 @@ jobs:
           args: --target ${{ matrix.target }}
 
       # ---- Signed Windows path (SignPath) ----
-      # Sign porthop.exe first, then build the installers around it, then sign the installers.
+      # Sign tunnelpup.exe first, then build the installers around it, then sign the installers.
 
-      - name: Build porthop.exe
+      - name: Build tunnelpup.exe
         if: env.SIGN_WINDOWS == 'true'
         run: npm run tauri build -- --target ${{ matrix.target }} --no-bundle
 
-      - name: Upload porthop.exe for signing
+      - name: Upload tunnelpup.exe for signing
         if: env.SIGN_WINDOWS == 'true'
         id: unsigned-exe
         uses: actions/upload-artifact@v4
         with:
-          name: porthop-exe-unsigned
-          path: ${{ env.BUILD_DIR }}/porthop.exe
+          name: tunnelpup-exe-unsigned
+          path: ${{ env.BUILD_DIR }}/tunnelpup.exe
 
-      - name: Sign porthop.exe
+      - name: Sign tunnelpup.exe
         if: env.SIGN_WINDOWS == 'true'
         uses: signpath/github-action-submit-signing-request@v3
         with:
@@ -153,19 +151,19 @@ jobs:
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
           project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
-          artifact-configuration-slug: porthop-exe
+          artifact-configuration-slug: tunnelpup-exe
           github-artifact-id: ${{ steps.unsigned-exe.outputs.artifact-id }}
           wait-for-completion: true
           # Each release waits for an approver to approve the request in SignPath.
           wait-for-completion-timeout-in-seconds: 3600
           output-artifact-directory: signed/exe
 
-      - name: Build the installers around the signed porthop.exe
+      - name: Build the installers around the signed tunnelpup.exe
         if: env.SIGN_WINDOWS == 'true'
         shell: pwsh
         run: |
-          Copy-Item signed/exe/porthop.exe "$env:BUILD_DIR/porthop.exe" -Force
-          # Binary patching would edit porthop.exe and break its signature.
+          Copy-Item signed/exe/tunnelpup.exe "$env:BUILD_DIR/tunnelpup.exe" -Force
+          # Binary patching would edit tunnelpup.exe and break its signature.
           npx tauri bundle --target ${{ matrix.target }} --no-binary-patching
           New-Item -ItemType Directory -Force unsigned/installers | Out-Null
           Copy-Item "$env:BUILD_DIR/bundle/nsis/*.exe", "$env:BUILD_DIR/bundle/msi/*.msi" unsigned/installers/

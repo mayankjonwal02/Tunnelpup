@@ -1,19 +1,19 @@
-# Releasing PortHop
+# Releasing TunnelPup
 
 Installers are built by GitHub Actions ([`.github/workflows/release.yml`](../.github/workflows/release.yml)), one job per system, and attached to a **draft** release:
 
 | Job | Installers |
 | --- | --- |
-| Windows | `PortHop_<version>_x64-setup.exe`, `PortHop_<version>_x64_en-US.msi` |
-| macOS (Apple Silicon) | `PortHop_<version>_aarch64.dmg` |
-| macOS (Intel) | `PortHop_<version>_x64.dmg` |
-| Linux | `PortHop_<version>_amd64.AppImage`, `.deb`, `.rpm` |
+| Windows | `TunnelPup_<version>_x64-setup.exe`, `TunnelPup_<version>_x64_en-US.msi` |
+| macOS (Apple Silicon) | `TunnelPup_<version>_aarch64.dmg` |
+| macOS (Intel) | `TunnelPup_<version>_x64.dmg` |
+| Linux | `TunnelPup_<version>_amd64.AppImage`, `.deb`, `.rpm` |
 
 ## Making a release
 
 1. Set the new version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
 2. Commit, then either push a tag (`git tag v0.2.0 && git push origin v0.2.0`) or run **Actions → Release → Run workflow**.
-3. When all jobs are green, open **Releases**, check the draft, and publish it.
+3. When all jobs are green, open **Releases**, check the draft, and publish it. Each run starts the draft over, with the notes from `.github/release-notes.md`, so make any edits to the draft after the last run.
 
 To try installers locally, `npm run tauri build` builds the ones for your own system into `src-tauri/target/release/bundle/`.
 
@@ -35,12 +35,12 @@ The repository already meets the requirements: an OSI licence ([MIT](../LICENSE)
    - create a signing policy (the workflow assumes the slug `release-signing`);
    - create two artifact configurations with these slugs (adjust the version/metadata rules with SignPath if they ask):
 
-     `porthop-exe`
+     `tunnelpup-exe`
      ```xml
      <?xml version="1.0" encoding="utf-8"?>
      <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
        <zip-file>
-         <pe-file path="porthop.exe" product-name="PortHop">
+         <pe-file path="tunnelpup.exe" product-name="TunnelPup">
            <authenticode-sign/>
          </pe-file>
        </zip-file>
@@ -52,10 +52,10 @@ The repository already meets the requirements: an OSI licence ([MIT](../LICENSE)
      <?xml version="1.0" encoding="utf-8"?>
      <artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
        <zip-file>
-         <pe-file path="PortHop_*_x64-setup.exe">
+         <pe-file path="TunnelPup_*_x64-setup.exe">
            <authenticode-sign/>
          </pe-file>
-         <msi-file path="PortHop_*_x64_en-US.msi">
+         <msi-file path="TunnelPup_*_x64_en-US.msi">
            <authenticode-sign/>
          </msi-file>
        </zip-file>
@@ -65,6 +65,6 @@ The repository already meets the requirements: an OSI licence ([MIT](../LICENSE)
    - secret `SIGNPATH_API_TOKEN` (a SignPath user with submitter rights),
    - variables `SIGNPATH_ORGANIZATION_ID` and `SIGNPATH_PROJECT_SLUG` (and `SIGNPATH_SIGNING_POLICY_SLUG` if it isn't `release-signing`).
 
-From the next release on, the Windows job builds `porthop.exe`, has SignPath sign it, packages the installers around the signed exe, has SignPath sign the installers, checks the signatures and attaches them. Each release waits (up to an hour) for you to approve the two signing requests in SignPath.
+From the next release on, the Windows job builds `tunnelpup.exe`, has SignPath sign it, packages the installers around the signed exe, has SignPath sign the installers, checks the signatures and attaches them. Each release waits (up to an hour) for you to approve the two signing requests in SignPath.
 
-`porthop-cloudflared.exe` is never re-signed: it's Cloudflare's cloudflared, only renamed, and already carries Cloudflare's signature.
+`tunnelpup-cloudflared.exe` is never re-signed: it's Cloudflare's cloudflared, only renamed, and already carries Cloudflare's signature.

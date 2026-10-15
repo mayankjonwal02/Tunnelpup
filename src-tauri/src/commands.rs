@@ -11,7 +11,7 @@ use crate::connector::{Connector, ConnectorStatus};
 use crate::error::{AppError, AppResult};
 use crate::freedomain::{self, Availability};
 use crate::verify::CertStatus;
-use crate::{ports, secrets, verify};
+use crate::{migrate, ports, secrets, verify};
 
 const ROUTE_PROGRESS_EVENT: &str = "route-progress";
 
@@ -130,7 +130,7 @@ pub async fn save_token(app: AppHandle, token: String) -> AppResult<Vec<Account>
         AppError::Invalid("The token works but can't see any account. Add the 'Account → Account Settings: Read' permission.".into())
     })?;
     // The pre-filled token link can't include the Tunnel permission, so check it now rather
-    // than failing later when PortHop creates the tunnel.
+    // than failing later when TunnelPup creates the tunnel.
     if let Err(e) = client.find_tunnel(&first.id, &machine_tunnel_name()).await
         && is_permission_error(&e)
     {
@@ -234,7 +234,8 @@ pub async fn check_zone(zone_id: String) -> AppResult<Zone> {
 
 // ---- tunnel -----------------------------------------------------------------
 
-/// Find this machine's tunnel (by name) or create it, then start cloudflared.
+/// Find this machine's tunnel (by name, including the one PortHop named) or create it,
+/// then start cloudflared.
 #[tauri::command]
 pub async fn ensure_tunnel(app: AppHandle, state: State<'_, ConfigState>) -> AppResult<TunnelInfo> {
     let cfg = current(&state);
@@ -247,7 +248,10 @@ pub async fn ensure_tunnel(app: AppHandle, state: State<'_, ConfigState>) -> App
             let name = machine_tunnel_name();
             let t = match client.find_tunnel(&account, &name).await? {
                 Some(t) => t,
-                None => client.create_tunnel(&account, &name).await?,
+                None => match client.find_tunnel(&account, &migrate::porthop_tunnel_name(&name)).await? {
+                    Some(t) => t,
+                    None => client.create_tunnel(&account, &name).await?,
+                },
             };
             let info = TunnelInfo { id: t.id, name: t.name };
             update(&app, |c| c.tunnel = Some(info.clone()))?;
@@ -463,7 +467,7 @@ fn machine_tunnel_name() -> String {
         .collect::<String>()
         .trim_matches('-')
         .to_string();
-    format!("porthop-{}", if clean.is_empty() { "machine".into() } else { clean })
+    format!("tunnelpup-{}", if clean.is_empty() { "machine".into() } else { clean })
 }
 
 #[cfg(test)]
