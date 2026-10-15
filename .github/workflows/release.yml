@@ -29,7 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # One draft for all jobs to upload into; a re-run reuses it instead of making another.
+      # One draft for all jobs to upload into; a re-run reuses it instead of making another,
+      # and moves it to the commit being built, since publishing tags the draft's commit.
       - id: release
         uses: actions/github-script@v7
         with:
@@ -40,7 +41,15 @@ jobs:
             const releases = await github.paginate(github.rest.repos.listReleases, context.repo);
             const existing = releases.find((r) => r.tag_name === tag);
             if (existing) {
-              if (!existing.draft) core.setFailed(`${tag} is already published; bump the version first.`);
+              if (!existing.draft) {
+                core.setFailed(`${tag} is already published; bump the version first.`);
+              } else if (existing.target_commitish !== context.sha) {
+                await github.rest.repos.updateRelease({
+                  ...context.repo,
+                  release_id: existing.id,
+                  target_commitish: context.sha,
+                });
+              }
               return existing.id;
             }
             const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
