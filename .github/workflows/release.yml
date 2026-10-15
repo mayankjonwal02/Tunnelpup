@@ -1,0 +1,221 @@
+# Builds PortHop's installers for Windows, macOS and Linux and attaches them to a draft
+# GitHub release. Each system has to build its own installers, so there's one job per system.
+#
+# Run it from the Actions tab ("Release" → "Run workflow"), or push a version tag:
+#   git tag v0.1.0 && git push origin v0.1.0
+# Then review the draft under Releases and publish it. See docs/RELEASING.md.
+#
+# Windows code signing (SignPath Foundation) switches on by itself once the repository has
+# the secret SIGNPATH_API_TOKEN and the variables SIGNPATH_ORGANIZATION_ID and
+# SIGNPATH_PROJECT_SLUG. Until then Windows builds are unsigned.
+
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  create-release:
+    name: Create draft release
+    runs-on: ubuntu-latest
+    outputs:
+      release-id: ${{ steps.release.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # One draft for all jobs to upload into; a re-run reuses it instead of making another.
+      - id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { version } = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+            const tag = `v${version}`;
+            const releases = await github.paginate(github.rest.repos.listReleases, context.repo);
+            const existing = releases.find((r) => r.tag_name === tag);
+            if (existing) {
+              if (!existing.draft) core.setFailed(`${tag} is already published; bump the version first.`);
+              return existing.id;
+            }
+            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+            const body = fs.readFileSync('.github/release-notes.md', 'utf8')
+              .replaceAll('{version}', version)
+              .replaceAll('{repo}', repoUrl);
+            const { data } = await github.rest.repos.createRelease({
+              ...context.repo,
+              tag_name: tag,
+              target_commitish: context.sha,
+              name: `PortHop ${tag}`,
+              body,
+              draft: true,
+            });
+            return data.id;
+
+  build:
+    name: ${{ matrix.name }}
+    needs: create-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: macOS (Apple Silicon)
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macOS (Intel)
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - name: Linux
+            # The oldest supported Ubuntu, so the AppImage runs on older distros too.
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_ID: ${{ needs.create-release.outputs.release-id }}
+      BUILD_DIR: src-tauri/target/${{ matrix.target }}/release
+      # "true" only for the Windows job, once SignPath is set up.
+      SIGN_WINDOWS: ${{ matrix.os == 'windows-latest' && vars.SIGNPATH_ORGANIZATION_ID != '' && vars.SIGNPATH_PROJECT_SLUG != '' && secrets.SIGNPATH_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev pkg-config
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
+
+      # npm ci fetches cloudflared for the runner itself; the Intel macOS build runs on an
+      # Apple Silicon runner, so fetch the binary for the build target explicitly too.
+      - run: npm ci
+      - run: node scripts/fetch-cloudflared.mjs --target ${{ matrix.target }}
+
+      # ---- Unsigned path (macOS, Linux, and Windows until SignPath is set up) ----
+
+      - name: Build and upload installers
+        if: env.SIGN_WINDOWS != 'true'
+        uses: tauri-apps/tauri-action@v0
+        with:
+          releaseId: ${{ env.RELEASE_ID }}
+          args: --target ${{ matrix.target }}
+
+      # ---- Signed Windows path (SignPath) ----
+      # Sign porthop.exe first, then build the installers around it, then sign the installers.
+
+      - name: Build porthop.exe
+        if: env.SIGN_WINDOWS == 'true'
+        run: npm run tauri build -- --target ${{ matrix.target }} --no-bundle
+
+      - name: Upload porthop.exe for signing
+        if: env.SIGN_WINDOWS == 'true'
+        id: unsigned-exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: porthop-exe-unsigned
+          path: ${{ env.BUILD_DIR }}/porthop.exe
+
+      - name: Sign porthop.exe
+        if: env.SIGN_WINDOWS == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+          artifact-configuration-slug: porthop-exe
+          github-artifact-id: ${{ steps.unsigned-exe.outputs.artifact-id }}
+          wait-for-completion: true
+          # Each release waits for an approver to approve the request in SignPath.
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed/exe
+
+      - name: Build the installers around the signed porthop.exe
+        if: env.SIGN_WINDOWS == 'true'
+        shell: pwsh
+        run: |
+          Copy-Item signed/exe/porthop.exe "$env:BUILD_DIR/porthop.exe" -Force
+          # Binary patching would edit porthop.exe and break its signature.
+          npx tauri bundle --target ${{ matrix.target }} --no-binary-patching
+          New-Item -ItemType Directory -Force unsigned/installers | Out-Null
+          Copy-Item "$env:BUILD_DIR/bundle/nsis/*.exe", "$env:BUILD_DIR/bundle/msi/*.msi" unsigned/installers/
+
+      - name: Upload installers for signing
+        if: env.SIGN_WINDOWS == 'true'
+        id: unsigned-installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-unsigned
+          path: unsigned/installers/
+
+      - name: Sign the installers
+        if: env.SIGN_WINDOWS == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
+          artifact-configuration-slug: installers
+          github-artifact-id: ${{ steps.unsigned-installers.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: signed/installers
+
+      - name: Check the signatures
+        if: env.SIGN_WINDOWS == 'true'
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem signed/installers -File
+          if (-not $files) { throw "SignPath returned no installers" }
+          foreach ($f in $files) {
+            $status = (Get-AuthenticodeSignature $f.FullName).Status
+            if ($status -ne 'Valid') { throw "$($f.Name) is not validly signed ($status)" }
+            Write-Host "$($f.Name): signed"
+          }
+
+      - name: Attach the signed installers to the release
+        if: env.SIGN_WINDOWS == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const release_id = Number(process.env.RELEASE_ID);
+            const dir = 'signed/installers';
+            const existing = await github.paginate(github.rest.repos.listReleaseAssets, { ...context.repo, release_id });
+            for (const name of fs.readdirSync(dir)) {
+              // A re-run replaces what an earlier run uploaded.
+              const old = existing.find((a) => a.name === name);
+              if (old) await github.rest.repos.deleteReleaseAsset({ ...context.repo, asset_id: old.id });
+              const data = fs.readFileSync(path.join(dir, name));
+              await github.rest.repos.uploadReleaseAsset({
+                ...context.repo,
+                release_id,
+                name,
+                data,
+                headers: { 'content-type': 'application/octet-stream', 'content-length': data.length },
+              });
+              core.info(`Attached ${name}`);
+            }
