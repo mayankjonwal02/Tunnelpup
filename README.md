@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128@2x.png" width="112" alt="PortHop logo: a rabbit hopping out of its hole" />
+  <img src="src-tauri/icons/128x128@2x.png" width="112" alt="PortHop logo: a pup peeking out of a tunnel" />
 </p>
 
 <h1 align="center">PortHop</h1>
