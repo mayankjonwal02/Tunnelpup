@@ -14,7 +14,7 @@
 
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,9 +43,12 @@ function hostTriple() {
   return m[1];
 }
 
+// Two independent SHA-256 sources from the GitHub release, both best effort: if the API is
+// unreachable or rate-limited we warn and continue unverified.
+//  - digests: GitHub's own checksum of each release file, exactly as it's served.
+//  - notes: the checksums Cloudflare lists in the release notes. For the plain binaries these
+//    are the file itself; for the macOS .tgz archives they're the cloudflared binary inside.
 async function fetchChecksums() {
-  // Cloudflare lists SHA256 checksums in the release notes. Best effort: if the
-  // API is unreachable or rate-limited we warn and continue.
   try {
     // In CI, GITHUB_TOKEN avoids the low anonymous rate limit shared by all runners.
     const auth = process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {};
@@ -54,16 +57,27 @@ async function fetchChecksums() {
       { headers: { Accept: "application/vnd.github+json", "User-Agent": "porthop-build", ...auth } },
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const { body = "" } = await res.json();
-    const sums = {};
+    const { body = "", assets = [] } = await res.json();
+    const notes = {};
     for (const m of body.matchAll(/^\s*(cloudflared-[\w.-]+):\s*([a-f0-9]{64})\s*$/gim)) {
-      sums[m[1]] = m[2].toLowerCase();
+      notes[m[1]] = m[2].toLowerCase();
     }
-    return sums;
+    const digests = {};
+    for (const a of assets) {
+      if (a.digest?.startsWith("sha256:")) digests[a.name] = a.digest.slice("sha256:".length).toLowerCase();
+    }
+    return { notes, digests };
   } catch (e) {
     console.warn(`! Could not fetch release checksums (${e.message}); skipping verification.`);
-    return {};
+    return { notes: {}, digests: {} };
   }
+}
+
+function verify(data, expected, what) {
+  if (!expected) return;
+  const actual = createHash("sha256").update(data).digest("hex");
+  if (actual !== expected) throw new Error(`Checksum mismatch for ${what}: expected ${expected}, got ${actual}`);
+  console.log(`  sha256 verified: ${what}`);
 }
 
 async function download(url) {
@@ -86,25 +100,21 @@ async function fetchTarget(triple, sums) {
 
   console.log(`↓ ${triple}: ${asset}`);
   const buf = await download(`${BASE}/${asset}`);
+  verify(buf, sums.digests[asset], `${asset} (GitHub)`);
 
-  const expected = sums[asset];
-  if (expected) {
-    const actual = createHash("sha256").update(buf).digest("hex");
-    if (actual !== expected) throw new Error(`Checksum mismatch for ${asset}: expected ${expected}, got ${actual}`);
-    console.log(`  sha256 verified`);
-  }
-
-  mkdirSync(OUT_DIR, { recursive: true });
+  let binary = buf;
   if (asset.endsWith(".tgz")) {
     const tmp = mkdtempSync(join(tmpdir(), "cloudflared-"));
     const tgz = join(tmp, asset);
     writeFileSync(tgz, buf);
     execSync(`tar -xzf "${tgz}" -C "${tmp}"`);
-    renameSync(join(tmp, "cloudflared"), dest);
+    binary = readFileSync(join(tmp, "cloudflared"));
     rmSync(tmp, { recursive: true, force: true });
-  } else {
-    writeFileSync(dest, buf);
   }
+  verify(binary, sums.notes[asset], `cloudflared from ${asset} (Cloudflare's release notes)`);
+
+  mkdirSync(OUT_DIR, { recursive: true });
+  writeFileSync(dest, binary);
   if (!isWindows) chmodSync(dest, 0o755);
   writeFileSync(stamp, CLOUDFLARED_VERSION);
   console.log(`  → ${dest}`);
