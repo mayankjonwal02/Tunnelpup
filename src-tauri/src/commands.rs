@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::cloudflare::{Account, Cloudflare, IngressRule, OriginRequest, Tunnel, Zone};
+use crate::cloudflare::{Account, Cloudflare, IngressRule, OriginRequest, Zone};
 use crate::config::{self, AppConfig, Route, TunnelInfo};
 use crate::connector::{Connector, ConnectorStatus};
 use crate::error::{AppError, AppResult};
@@ -104,19 +104,27 @@ pub async fn save_token(app: AppHandle, token: String) -> AppResult<Vec<Account>
         return Err(AppError::Invalid("Paste a Cloudflare API token first".into()));
     }
     let client = Cloudflare::new(&token)?;
-    let status = client.verify_token().await?;
+    let user_check = client.verify_token().await;
+    let accounts = visible_accounts(&client).await;
+    let status = match user_check {
+        Ok(status) => status,
+        // Account-owned tokens fail the user check as "invalid"; they verify against their account.
+        Err(e) if is_invalid_token(&e) => {
+            let mut found = None;
+            for account in &accounts {
+                if let Ok(status) = client.verify_account_token(&account.id).await {
+                    found = Some(status);
+                    break;
+                }
+            }
+            found.ok_or_else(|| {
+                AppError::Invalid("Cloudflare doesn't recognise this token. Copy it again from the Cloudflare dashboard.".into())
+            })?
+        }
+        Err(e) => return Err(e),
+    };
     if status.status != "active" {
         return Err(AppError::Invalid(format!("This token is {}", status.status)));
-    }
-    let mut accounts = client.list_accounts().await?;
-    if accounts.is_empty() {
-        // Listing accounts needs "Account Settings: Read"; without it Cloudflare returns an
-        // empty list rather than an error. Fall back to the accounts that own visible zones.
-        for zone in client.list_zones(None).await.unwrap_or_default() {
-            if !accounts.iter().any(|a| a.id == zone.account.id) {
-                accounts.push(zone.account);
-            }
-        }
     }
     let first = accounts.first().cloned().ok_or_else(|| {
         AppError::Invalid("The token works but can't see any account. Add the 'Account → Account Settings: Read' permission.".into())
@@ -264,12 +272,6 @@ pub fn stop_tunnel(app: AppHandle, connector: State<Connector>) {
     connector.stop(&app);
 }
 
-#[tauri::command]
-pub async fn tunnel_health(state: State<'_, ConfigState>) -> AppResult<Tunnel> {
-    let cfg = current(&state);
-    cf()?.get_tunnel(&account_id(&cfg)?, &tunnel_id(&cfg)?).await
-}
-
 // ---- routes -----------------------------------------------------------------
 
 /// Map `subdomain.zone` to a local port. The route is saved, and so shown, only once
@@ -409,6 +411,26 @@ fn is_permission_error(e: &AppError) -> bool {
     matches!(e, AppError::Cloudflare(msg) if ["(code 10000)", "(code 1068)", "(code 9109)"].iter().any(|c| msg.contains(c)))
 }
 
+/// Cloudflare's "Invalid API Token". Also what the user-token check says about an account-owned token.
+fn is_invalid_token(e: &AppError) -> bool {
+    matches!(e, AppError::Cloudflare(msg) if msg.contains("(code 1000)"))
+}
+
+/// The accounts a token can see. Listing them needs "Account Settings: Read"; without it
+/// Cloudflare returns an empty list rather than an error, so fall back to the accounts that
+/// own the zones the token can see.
+async fn visible_accounts(client: &Cloudflare) -> Vec<Account> {
+    let mut accounts = client.list_accounts().await.unwrap_or_default();
+    if accounts.is_empty() {
+        for zone in client.list_zones(None).await.unwrap_or_default() {
+            if !accounts.iter().any(|a| a.id == zone.account.id) {
+                accounts.push(zone.account);
+            }
+        }
+    }
+    accounts
+}
+
 /// Cloudflare refusing a zone because the domain isn't registered (yet).
 fn is_unregistered_error(e: &AppError) -> bool {
     matches!(e, AppError::Cloudflare(msg) if msg.contains("(code 1049)") || msg.contains("not a registered domain"))
@@ -442,4 +464,20 @@ fn machine_tunnel_name() -> String {
         .trim_matches('-')
         .to_string();
     format!("porthop-{}", if clean.is_empty() { "machine".into() } else { clean })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tells_cloudflare_error_codes_apart() {
+        let invalid = AppError::Cloudflare("Invalid API Token (code 1000)".into());
+        assert!(is_invalid_token(&invalid));
+        assert!(!is_permission_error(&invalid));
+
+        let denied = AppError::Cloudflare("Authentication error (code 10000)".into());
+        assert!(is_permission_error(&denied));
+        assert!(!is_invalid_token(&denied), "code 10000 isn't code 1000");
+    }
 }

@@ -158,6 +158,7 @@ The in-app **Guide** has the same answers, plus more detail.
 - **Your API token stays on your computer**, in the system keychain (Windows Credential Manager, macOS Keychain, or the Secret Service on Linux), and is only ever sent to Cloudflare. Signing out removes it.
 - **No analytics or telemetry.** PortHop talks to Cloudflare (to manage and serve your routes), to public DNS resolvers from Cloudflare and Google (to check your routes and domains work), and to DigitalPlat's nameservers (only when you check a free domain name). See the [privacy section of the code signing policy](CODE_SIGNING_POLICY.md#privacy-policy).
 - **The connector ends with PortHop.** On Windows it ends the moment PortHop does, even after a crash or a force-close; on macOS and Linux a leftover connector is ended the next time PortHop starts. Either way your sites don't quietly stay online without PortHop.
+- **Found a security problem?** Please report it privately; see [SECURITY.md](SECURITY.md).
 
 ## FAQ
 
@@ -219,6 +220,8 @@ Windows releases are being set up for free code signing through SignPath Foundat
 
 PortHop is released under the [MIT License](LICENSE).
 
-- Bundles [cloudflared](https://github.com/cloudflare/cloudflared) by Cloudflare, Inc. (Apache License 2.0), renamed to `porthop-cloudflared`.
+- Bundles [cloudflared](https://github.com/cloudflare/cloudflared) by Cloudflare, Inc. (Apache License 2.0), renamed to `porthop-cloudflared`. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - Free domains by [DigitalPlat FreeDomain](https://domain.digitalplat.org/).
 - Built with [Tauri](https://tauri.app/), [React](https://react.dev/) and [Rust](https://www.rust-lang.org/).
+
+PortHop is not affiliated with or endorsed by Cloudflare. "Cloudflare" is a trademark of Cloudflare, Inc.

@@ -116,7 +116,7 @@ jobs:
 
       - name: Build and upload installers
         if: env.SIGN_WINDOWS != 'true'
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         with:
           releaseId: ${{ env.RELEASE_ID }}
           args: --target ${{ matrix.target }}

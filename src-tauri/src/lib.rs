@@ -85,7 +85,6 @@ pub fn run() {
             commands::ensure_tunnel,
             commands::start_tunnel,
             commands::stop_tunnel,
-            commands::tunnel_health,
             commands::add_route,
             commands::update_route_port,
             commands::remove_route,

@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in PortHop doesn't work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please **don't paste API tokens**, and leave out any domain names you'd rather keep private.
+        Security problems go through **Security → Report a vulnerability** instead of an issue.
+  - type: input
+    id: version
+    attributes:
+      label: PortHop version
+      description: Shown in your installer's file name, e.g. 0.1.0
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: System
+      options:
+        - Windows 10/11
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (AppImage)
+        - Linux (.deb)
+        - Linux (.rpm)
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Connector logs
+      description: In PortHop open **Logs**, use **Copy**, and paste here (remove anything private).
+      render: text

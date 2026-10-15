@@ -55,20 +55,6 @@ pub struct Zone {
 pub struct Tunnel {
     pub id: String,
     pub name: String,
-    #[serde(default)]
-    pub status: Option<String>,
-    #[serde(default)]
-    pub connections: Vec<TunnelConnection>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TunnelConnection {
-    #[serde(default)]
-    pub colo_name: Option<String>,
-    #[serde(default)]
-    pub client_version: Option<String>,
-    #[serde(default)]
-    pub opened_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,8 +134,14 @@ impl Cloudflare {
 
     // ---- token & account ----------------------------------------------------
 
+    /// Verify a user API token.
     pub async fn verify_token(&self) -> AppResult<TokenStatus> {
         self.send(self.get("/user/tokens/verify")).await
+    }
+
+    /// Verify an account-owned API token, which `verify_token` rejects as invalid.
+    pub async fn verify_account_token(&self, account_id: &str) -> AppResult<TokenStatus> {
+        self.send(self.get(&format!("/accounts/{account_id}/tokens/verify"))).await
     }
 
     pub async fn list_accounts(&self) -> AppResult<Vec<Account>> {
@@ -195,10 +187,6 @@ impl Cloudflare {
     pub async fn create_tunnel(&self, account_id: &str, name: &str) -> AppResult<Tunnel> {
         let body = json!({ "name": name, "config_src": "cloudflare" });
         self.send(self.post(&format!("/accounts/{account_id}/cfd_tunnel")).json(&body)).await
-    }
-
-    pub async fn get_tunnel(&self, account_id: &str, tunnel_id: &str) -> AppResult<Tunnel> {
-        self.send(self.get(&format!("/accounts/{account_id}/cfd_tunnel/{tunnel_id}"))).await
     }
 
     /// The connector token cloudflared needs to run this tunnel. Keep it in memory only.
