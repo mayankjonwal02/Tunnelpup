@@ -1,9 +1,9 @@
 # Builds TunnelPup's installers for Windows, macOS and Linux and attaches them to a draft
 # GitHub release. Each system has to build its own installers, so there's one job per system.
 #
-# Run it from the Actions tab ("Release" → "Run workflow"), or push a version tag:
-#   git tag v0.1.0 && git push origin v0.1.0
-# Then review the draft under Releases and publish it. See docs/RELEASING.md.
+# Run it from the Actions tab ("Release" → "Run workflow"), then review the draft under Releases
+# and publish it. Publishing creates the version tag, so there's no tag to push (a tag trigger
+# would only start a second run that fails on the release just published). See docs/RELEASING.md.
 #
 # Windows code signing (SignPath Foundation) switches on by itself once the repository has
 # the secret SIGNPATH_API_TOKEN and the variables SIGNPATH_ORGANIZATION_ID and
@@ -13,8 +13,6 @@ name: Release
 
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 permissions:
   contents: write
