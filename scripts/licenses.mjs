@@ -7,7 +7,8 @@
 // Needs cargo-about: cargo install cargo-about --locked --features cli
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,12 +16,20 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT = join(ROOT, "public", "third-party-licenses.txt");
 const RULE = "-".repeat(80);
 
-const rust = execFileSync("cargo", ["about", "generate", "about.hbs"], {
-  cwd: join(ROOT, "src-tauri"),
-  encoding: "utf8",
-  maxBuffer: 64 * 1024 * 1024,
-  stdio: ["ignore", "pipe", "inherit"],
-});
+// cargo-about writes to a file, not stdout: under PowerShell (the shell on Windows runners) it
+// refuses redirected output, which PowerShell would re-encode.
+const tmp = mkdtempSync(join(tmpdir(), "tunnelpup-licenses-"));
+let rust;
+try {
+  const file = join(tmp, "rust.txt");
+  execFileSync("cargo", ["about", "generate", "--output-file", file, "about.hbs"], {
+    cwd: join(ROOT, "src-tauri"),
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  rust = readFileSync(file, "utf8");
+} finally {
+  rmSync(tmp, { recursive: true, force: true });
+}
 
 // Dual-licensed packages are used under MIT, like the Rust crates.
 function licenceText(dir) {
@@ -50,9 +59,7 @@ const npm = [...groups]
   .map(([text, names]) => `${RULE}\nUsed by:\n${names.map((n) => `  ${n}`).join("\n")}\n\n${text}\n`)
   .join("\n");
 
-writeFileSync(
-  OUT,
-  `Third-party software in TunnelPup
+const notices = `Third-party software in TunnelPup
 =================================
 
 ${rust.trim()}
@@ -63,6 +70,7 @@ npm packages
 
 TunnelPup's interface is built with these npm packages.
 
-${npm}`,
-);
+${npm}`;
+// One kind of line ending whatever the platform: a Windows checkout gives the template CRLF.
+writeFileSync(OUT, notices.replace(/\r\n?/g, "\n"));
 console.log(`Wrote ${OUT} (${packages.length} npm packages)`);
