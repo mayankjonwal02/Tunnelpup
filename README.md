@@ -18,16 +18,19 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/dashboard.png" width="760" alt="TunnelPup's main screen: four routes, each mapping a subdomain of example.com to a local port, with the tunnel shown as Live" />
+  <img src="docs/demo.gif" width="760" alt="TunnelPup in 15 seconds: paste a Cloudflare token, the tunnel goes live, add the route chat.example.com to localhost:5173, and the app opens at https://chat.example.com" />
 </p>
 
 TunnelPup is a free, open-source desktop app for Cloudflare Tunnel that gives the apps on your computer real public addresses on a domain you own. Pick a subdomain, pick a port, and TunnelPup sets up the Cloudflare Tunnel routing and DNS for you, then checks the link actually loads before it shows it to you. It runs quietly in the system tray, reconnects on its own, and tells you plainly when something needs your attention.
 
 **Website:** [tunnelpup.vercel.app](https://tunnelpup.vercel.app)
 
+TunnelPup is an independent open-source project. It is not affiliated with or endorsed by Cloudflare.
+
 ## Contents
 
 - [Why TunnelPup](#why-tunnelpup)
+- [Why not cloudflared or ngrok?](#why-not-cloudflared-or-ngrok)
 - [Features](#features)
 - [How it works](#how-it-works)
 - [Download](#download)
@@ -49,6 +52,14 @@ TunnelPup is a free, open-source desktop app for Cloudflare Tunnel that gives th
 - **HTTPS out of the box.** Cloudflare's free certificate covers `yourdomain.com` and names like `app.yourdomain.com`; TunnelPup waits until it's issued before it lets you use a new domain.
 - **It checks its own work.** A route only appears once TunnelPup has confirmed `https://…` loads through Cloudflare, and every route shows *App not running* if the app behind it stops.
 - **A real app, not a config file.** A desktop GUI for Cloudflare Tunnel: no YAML, no `cloudflared` commands. Point, click, share.
+
+## Why not cloudflared or ngrok?
+
+Both are good tools, and TunnelPup is built on one of them. Here is when each one fits.
+
+**`cloudflared` on its own** is what TunnelPup runs under the hood. Putting an app on your domain with it by hand means installing it, logging in, creating a named tunnel, writing a `config.yml` with ingress rules, adding a DNS route for every hostname and setting it up as a service. TunnelPup does all of that through Cloudflare's API from one window, checks that each link really loads, and handles apps that only answer to `localhost`. Use `cloudflared` directly on a server without a desktop, when you want the tunnel's config in version control, or when you need TCP, SSH or private networking, which TunnelPup doesn't do.
+
+**ngrok and Cloudflare's quick tunnels** are the quickest way to share something once, without a domain of your own. A quick tunnel gives you a random `trycloudflare.com` address that changes every time you start it. TunnelPup is for links you keep: they live on your own domain, keep the same address every time, and come with HTTPS. The trade-off is that you need a Cloudflare account and a domain, and TunnelPup can walk you through getting a free one.
 
 ## Features
 
@@ -169,9 +180,7 @@ The in-app **Guide** has the same answers, plus more detail.
 
 **Is it free?** TunnelPup is free and open source (MIT). Cloudflare Tunnel is free on Cloudflare's free plan. You need a domain, either one you own or a free one from DigitalPlat.
 
-**How is it different from ngrok or Cloudflare's quick tunnels?** It does the same job of putting an app on your computer on the internet, but on a domain you own. Your links keep the same address every time you start TunnelPup, so you can bookmark them, send them to clients and put them in a README.
-
-**Do I need to use `cloudflared` on the command line?** No. TunnelPup bundles `cloudflared`, creates the tunnel, routing rules and DNS records through Cloudflare's API, and runs the connector for you. You never type a command or edit a config file.
+**How is it different from ngrok or `cloudflared`?** See [Why not cloudflared or ngrok?](#why-not-cloudflared-or-ngrok).
 
 **Does my computer need to stay on?** Yes. Your routes are served from your computer, so they're online while it's on and TunnelPup is running.
 
