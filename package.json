@@ -9,6 +9,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "licenses": "node scripts/licenses.mjs",
     "postinstall": "node scripts/fetch-cloudflared.mjs"
   },
   "dependencies": {

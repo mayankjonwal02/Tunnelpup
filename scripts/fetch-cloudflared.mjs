@@ -10,7 +10,10 @@
 //   node scripts/fetch-cloudflared.mjs --all      # every supported target (for CI)
 //   node scripts/fetch-cloudflared.mjs --target aarch64-apple-darwin
 //
-// Bump CLOUDFLARED_VERSION when you ship an app update with a newer connector.
+// Bump CLOUDFLARED_VERSION when you ship an app update with a newer connector, and update
+// SHA256 with it. Each value is the SHA-256 of the release file, which GitHub shows next to the
+// file on the release page. Cross-check it against the checksums in Cloudflare's release notes:
+// for the plain binaries they're the same, for the macOS .tgz files they're the binary inside.
 
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -20,6 +23,15 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const CLOUDFLARED_VERSION = "2026.10.0";
+
+// A download that doesn't match is never used.
+const SHA256 = {
+  "cloudflared-windows-amd64.exe": "86aee4017b26625cee8484c113558f48effa4cd47f7aa05fcf425604e5d2b23c",
+  "cloudflared-darwin-amd64.tgz": "903845b81828c8cb3c5d13d816a2de71c06a3da5785469df8eb0e1b736d92f9f",
+  "cloudflared-darwin-arm64.tgz": "a2f79ff7b9420aa537d74af239f376da170bbabeb529aec416002adac6a72e70",
+  "cloudflared-linux-amd64": "d33ff2d14475178d2012c2c56beba87389ac5ded27649519f198a7d3134a99db",
+  "cloudflared-linux-arm64": "e6422b9d4f72d3194bc5a38676f13667c06666523217b842a877d72a80b5ac08",
+};
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OUT_DIR = join(ROOT, "src-tauri", "binaries");
@@ -43,41 +55,12 @@ function hostTriple() {
   return m[1];
 }
 
-// Two independent SHA-256 sources from the GitHub release, both best effort: if the API is
-// unreachable or rate-limited we warn and continue unverified.
-//  - digests: GitHub's own checksum of each release file, exactly as it's served.
-//  - notes: the checksums Cloudflare lists in the release notes. For the plain binaries these
-//    are the file itself; for the macOS .tgz archives they're the cloudflared binary inside.
-async function fetchChecksums() {
-  try {
-    // In CI, GITHUB_TOKEN avoids the low anonymous rate limit shared by all runners.
-    const auth = process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {};
-    const res = await fetch(
-      `https://api.github.com/repos/cloudflare/cloudflared/releases/tags/${CLOUDFLARED_VERSION}`,
-      { headers: { Accept: "application/vnd.github+json", "User-Agent": "tunnelpup-build", ...auth } },
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const { body = "", assets = [] } = await res.json();
-    const notes = {};
-    for (const m of body.matchAll(/^\s*(cloudflared-[\w.-]+):\s*([a-f0-9]{64})\s*$/gim)) {
-      notes[m[1]] = m[2].toLowerCase();
-    }
-    const digests = {};
-    for (const a of assets) {
-      if (a.digest?.startsWith("sha256:")) digests[a.name] = a.digest.slice("sha256:".length).toLowerCase();
-    }
-    return { notes, digests };
-  } catch (e) {
-    console.warn(`! Could not fetch release checksums (${e.message}); skipping verification.`);
-    return { notes: {}, digests: {} };
-  }
-}
-
-function verify(data, expected, what) {
-  if (!expected) return;
+function verify(data, asset) {
+  const expected = SHA256[asset];
+  if (!expected) throw new Error(`No SHA-256 pinned for ${asset}; add it to SHA256 in this script.`);
   const actual = createHash("sha256").update(data).digest("hex");
-  if (actual !== expected) throw new Error(`Checksum mismatch for ${what}: expected ${expected}, got ${actual}`);
-  console.log(`  sha256 verified: ${what}`);
+  if (actual !== expected) throw new Error(`Checksum mismatch for ${asset}: expected ${expected}, got ${actual}`);
+  console.log(`  sha256 verified: ${asset}`);
 }
 
 async function download(url) {
@@ -86,7 +69,7 @@ async function download(url) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-async function fetchTarget(triple, sums) {
+async function fetchTarget(triple) {
   const asset = ASSETS[triple];
   if (!asset) throw new Error(`Unsupported target: ${triple}. Supported: ${Object.keys(ASSETS).join(", ")}`);
 
@@ -100,7 +83,7 @@ async function fetchTarget(triple, sums) {
 
   console.log(`↓ ${triple}: ${asset}`);
   const buf = await download(`${BASE}/${asset}`);
-  verify(buf, sums.digests[asset], `${asset} (GitHub)`);
+  verify(buf, asset);
 
   let binary = buf;
   if (asset.endsWith(".tgz")) {
@@ -111,7 +94,6 @@ async function fetchTarget(triple, sums) {
     binary = readFileSync(join(tmp, "cloudflared"));
     rmSync(tmp, { recursive: true, force: true });
   }
-  verify(binary, sums.notes[asset], `cloudflared from ${asset} (Cloudflare's release notes)`);
 
   mkdirSync(OUT_DIR, { recursive: true });
   writeFileSync(dest, binary);
@@ -127,5 +109,4 @@ const targets = args.includes("--all")
     ? [args[args.indexOf("--target") + 1]]
     : [hostTriple()];
 
-const sums = await fetchChecksums();
-for (const t of targets) await fetchTarget(t, sums);
+for (const t of targets) await fetchTarget(t);

@@ -11,7 +11,7 @@ use crate::connector::{Connector, ConnectorStatus};
 use crate::error::{AppError, AppResult};
 use crate::freedomain::{self, Availability};
 use crate::verify::CertStatus;
-use crate::{migrate, ports, secrets, verify};
+use crate::{ports, secrets, verify};
 
 const ROUTE_PROGRESS_EVENT: &str = "route-progress";
 
@@ -118,7 +118,9 @@ pub async fn save_token(app: AppHandle, token: String) -> AppResult<Vec<Account>
                 }
             }
             found.ok_or_else(|| {
-                AppError::Invalid("Cloudflare doesn't recognise this token. Copy it again from the Cloudflare dashboard.".into())
+                AppError::Invalid(
+                    "Cloudflare doesn't recognise this token. Copy it again from the Cloudflare dashboard.".into(),
+                )
             })?
         }
         Err(e) => return Err(e),
@@ -127,7 +129,9 @@ pub async fn save_token(app: AppHandle, token: String) -> AppResult<Vec<Account>
         return Err(AppError::Invalid(format!("This token is {}", status.status)));
     }
     let first = accounts.first().cloned().ok_or_else(|| {
-        AppError::Invalid("The token works but can't see any account. Add the 'Account → Account Settings: Read' permission.".into())
+        AppError::Invalid(
+            "The token works but can't see any account. Add the 'Account → Account Settings: Read' permission.".into(),
+        )
     })?;
     // The pre-filled token link can't include the Tunnel permission, so check it now rather
     // than failing later when TunnelPup creates the tunnel.
@@ -234,8 +238,7 @@ pub async fn check_zone(zone_id: String) -> AppResult<Zone> {
 
 // ---- tunnel -----------------------------------------------------------------
 
-/// Find this machine's tunnel (by name, including the one PortHop named) or create it,
-/// then start cloudflared.
+/// Find this machine's tunnel (by name) or create it, then start cloudflared.
 #[tauri::command]
 pub async fn ensure_tunnel(app: AppHandle, state: State<'_, ConfigState>) -> AppResult<TunnelInfo> {
     let cfg = current(&state);
@@ -248,10 +251,7 @@ pub async fn ensure_tunnel(app: AppHandle, state: State<'_, ConfigState>) -> App
             let name = machine_tunnel_name();
             let t = match client.find_tunnel(&account, &name).await? {
                 Some(t) => t,
-                None => match client.find_tunnel(&account, &migrate::porthop_tunnel_name(&name)).await? {
-                    Some(t) => t,
-                    None => client.create_tunnel(&account, &name).await?,
-                },
+                None => client.create_tunnel(&account, &name).await?,
             };
             let info = TunnelInfo { id: t.id, name: t.name };
             update(&app, |c| c.tunnel = Some(info.clone()))?;
@@ -305,22 +305,35 @@ pub async fn add_route(
 
     // Catch what we can locally before changing anything in Cloudflare.
     if !matches!(app.state::<Connector>().status(), ConnectorStatus::Connected { .. }) {
-        return Err(AppError::Invalid("The tunnel isn't connected. Start it and wait for \"Live\", then add the route.".into()));
+        return Err(AppError::Invalid(
+            "The tunnel isn't connected. Start it and wait for \"Live\", then add the route.".into(),
+        ));
     }
     progress(&app, format!("Checking localhost:{port}…"));
     if !ports::is_listening(port).await {
-        return Err(AppError::Invalid(format!("Nothing is running on localhost:{port}. Start your app first, then add the route.")));
+        return Err(AppError::Invalid(format!(
+            "Nothing is running on localhost:{port}. Start your app first, then add the route."
+        )));
     }
     // Apps like Ollama or Vite refuse requests addressed to anything but localhost. Spot that
     // now and have cloudflared send them Host: localhost instead of a 403.
     let rewrite_host = verify::rejects_public_host(&hostname, port).await;
     if rewrite_host {
-        progress(&app, format!("localhost:{port} only answers to localhost, so {hostname} will send it Host: localhost…"));
+        progress(
+            &app,
+            format!("localhost:{port} only answers to localhost, so {hostname} will send it Host: localhost…"),
+        );
     }
     let client = cf()?;
 
     let mut routes = cfg.routes.clone();
-    routes.push(Route { hostname: hostname.clone(), zone_id: zone_id.clone(), port, dns_record_id: None, rewrite_host });
+    routes.push(Route {
+        hostname: hostname.clone(),
+        zone_id: zone_id.clone(),
+        port,
+        dns_record_id: None,
+        rewrite_host,
+    });
 
     progress(&app, format!("Routing {hostname} through the tunnel…"));
     client.put_ingress(&account, &tunnel, &ingress_for(&routes)).await?;
@@ -353,7 +366,12 @@ pub async fn add_route(
 }
 
 #[tauri::command]
-pub async fn update_route_port(app: AppHandle, lock: State<'_, RouteLock>, hostname: String, port: u16) -> AppResult<()> {
+pub async fn update_route_port(
+    app: AppHandle,
+    lock: State<'_, RouteLock>,
+    hostname: String,
+    port: u16,
+) -> AppResult<()> {
     let _guard = lock.0.lock().await;
     if port == 0 {
         return Err(AppError::Invalid("Port must be between 1 and 65535".into()));
@@ -382,16 +400,15 @@ pub async fn remove_route(app: AppHandle, lock: State<'_, RouteLock>, hostname: 
     let client = cf()?;
 
     client.put_ingress(&account_id(&cfg)?, &tunnel_id(&cfg)?, &ingress_for(&remaining)).await?;
-    if let Some(id) = &route.dns_record_id {
-        // Already-deleted records are fine; anything else is surfaced.
-        if let Err(e) = client.delete_dns_record(&route.zone_id, id).await {
-            if !e.to_string().contains("81044") {
-                update(&app, |c| c.routes = remaining.clone())?;
-                return Err(AppError::Cloudflare(format!(
-                    "Route removed, but the DNS record for {hostname} could not be deleted: {e}"
-                )));
-            }
-        }
+    // Already-deleted records are fine; anything else is surfaced.
+    if let Some(id) = &route.dns_record_id
+        && let Err(e) = client.delete_dns_record(&route.zone_id, id).await
+        && !e.to_string().contains("81044")
+    {
+        update(&app, |c| c.routes = remaining.clone())?;
+        return Err(AppError::Cloudflare(format!(
+            "Route removed, but the DNS record for {hostname} could not be deleted: {e}"
+        )));
     }
     update(&app, |c| c.routes = remaining)?;
     Ok(())

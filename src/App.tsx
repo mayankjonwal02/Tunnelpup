@@ -1073,6 +1073,17 @@ function Settings({ snap, onClose, onSignedOut }: { snap: Snapshot; onClose: () 
   const [autostart, setAutostart] = useState(false);
   const [updateMsg, setUpdateMsg] = useState<string | null>(null);
   const [showLicense, setShowLicense] = useState(false);
+  // Notices for everything else, generated for release builds (scripts/licenses.mjs).
+  const [otherLicenses, setOtherLicenses] = useState<string | null>(null);
+  const toggleLicenses = () => {
+    setShowLicense(!showLicense);
+    if (otherLicenses === null) {
+      fetch("/third-party-licenses.txt")
+        .then((r) => (r.ok && r.headers.get("content-type")?.startsWith("text/plain") ? r.text() : ""))
+        .then(setOtherLicenses)
+        .catch(() => setOtherLicenses(""));
+    }
+  };
   const [theme, setTheme] = useState(loadTheme);
   const chooseTheme = (choice: ThemeChoice) => {
     saveTheme(choice);
@@ -1118,8 +1129,15 @@ function Settings({ snap, onClose, onSignedOut }: { snap: Snapshot; onClose: () 
           <div className="row"><button onClick={update}>Check for updates</button>{updateMsg && <span className="muted small">{updateMsg}</span>}</div>
         )}
         <p className="muted small">Bundled cloudflared {snap.cloudflaredVersion}</p>
-        <button className="ghost" onClick={() => setShowLicense(!showLicense)}>Open-source licenses</button>
-        {showLicense && <pre className="logs license">cloudflared — Apache License 2.0{"\n\n"}{cloudflaredLicense}</pre>}
+        <button className="ghost" onClick={toggleLicenses}>Open-source licenses</button>
+        {showLicense && (
+          <pre className="logs license">
+            cloudflared — Apache License 2.0{"\n\n"}{cloudflaredLicense}{"\n\n"}
+            {otherLicenses === null
+              ? "Loading…"
+              : otherLicenses || "Full notices for TunnelPup's other components are included in release builds."}
+          </pre>
+        )}
         <hr />
         <button className="danger" onClick={async () => { if (confirm("Stop the tunnel and remove the saved token from this computer? Nothing is deleted in Cloudflare.")) { await api.signOut(); onSignedOut(); } }}>
           Sign out

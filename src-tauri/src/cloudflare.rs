@@ -2,12 +2,15 @@
 //! Field names follow https://developers.cloudflare.com/api/ — re-check them
 //! against the docs if a call starts failing after a Cloudflare change.
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_json::{Value, json};
 
 use crate::error::{AppError, AppResult};
 
 const API: &str = "https://api.cloudflare.com/client/v4";
+
+/// The comment on the DNS records TunnelPup creates.
+const MANAGED_COMMENT: &str = "Managed by TunnelPup";
 
 #[derive(Clone)]
 pub struct Cloudflare {
@@ -21,6 +24,15 @@ struct Envelope<T> {
     #[serde(default)]
     errors: Vec<ApiMessage>,
     result: Option<T>,
+    #[serde(default)]
+    result_info: Option<ResultInfo>,
+}
+
+/// Paging details that list endpoints send next to `result`.
+#[derive(Deserialize)]
+struct ResultInfo {
+    #[serde(default)]
+    total_pages: u32,
 }
 
 #[derive(Deserialize)]
@@ -98,6 +110,26 @@ impl Cloudflare {
     }
 
     async fn send<T: DeserializeOwned>(&self, req: reqwest::RequestBuilder) -> AppResult<T> {
+        Ok(self.send_page(req).await?.0)
+    }
+
+    /// Every page of a list endpoint, which returns at most 50 items per page.
+    async fn send_all<T: DeserializeOwned>(&self, path: &str, query: &[(&str, &str)]) -> AppResult<Vec<T>> {
+        let mut all = Vec::new();
+        let mut page = 1u32;
+        loop {
+            let req = self.get(path).query(query).query(&[("page", page), ("per_page", 50)]);
+            let (items, pages): (Vec<T>, u32) = self.send_page(req).await?;
+            all.extend(items);
+            if page >= pages {
+                return Ok(all);
+            }
+            page += 1;
+        }
+    }
+
+    /// `send`, plus how many pages the list has (1 for anything that isn't a list).
+    async fn send_page<T: DeserializeOwned>(&self, req: reqwest::RequestBuilder) -> AppResult<(T, u32)> {
         let res = req.bearer_auth(&self.token).send().await?;
         let status = res.status();
         let text = res.text().await?;
@@ -105,15 +137,13 @@ impl Cloudflare {
             AppError::Cloudflare(format!("Unexpected response (HTTP {status}): {}", truncate(&text, 300)))
         })?;
         if !env.success {
-            let msg = env
-                .errors
-                .iter()
-                .map(|e| format!("{} (code {})", e.message, e.code))
-                .collect::<Vec<_>>()
-                .join("; ");
+            let msg =
+                env.errors.iter().map(|e| format!("{} (code {})", e.message, e.code)).collect::<Vec<_>>().join("; ");
             return Err(AppError::Cloudflare(if msg.is_empty() { format!("HTTP {status}") } else { msg }));
         }
-        env.result.ok_or_else(|| AppError::Cloudflare("Response had no result".into()))
+        let pages = env.result_info.map_or(1, |i| i.total_pages);
+        let result = env.result.ok_or_else(|| AppError::Cloudflare("Response had no result".into()))?;
+        Ok((result, pages))
     }
 
     fn get(&self, path: &str) -> reqwest::RequestBuilder {
@@ -145,18 +175,18 @@ impl Cloudflare {
     }
 
     pub async fn list_accounts(&self) -> AppResult<Vec<Account>> {
-        self.send(self.get("/accounts?per_page=50")).await
+        self.send_all("/accounts", &[]).await
     }
 
     // ---- zones --------------------------------------------------------------
 
     /// Zones the token can see, optionally only those in one account.
     pub async fn list_zones(&self, account_id: Option<&str>) -> AppResult<Vec<Zone>> {
-        let mut req = self.get("/zones?per_page=50&order=name");
+        let mut query = vec![("order", "name")];
         if let Some(id) = account_id {
-            req = req.query(&[("account.id", id)]);
+            query.push(("account.id", id));
         }
-        self.send(req).await
+        self.send_all("/zones", &query).await
     }
 
     pub async fn get_zone(&self, zone_id: &str) -> AppResult<Zone> {
@@ -177,9 +207,8 @@ impl Cloudflare {
     // ---- tunnels ------------------------------------------------------------
 
     pub async fn find_tunnel(&self, account_id: &str, name: &str) -> AppResult<Option<Tunnel>> {
-        let req = self
-            .get(&format!("/accounts/{account_id}/cfd_tunnel"))
-            .query(&[("name", name), ("is_deleted", "false")]);
+        let req =
+            self.get(&format!("/accounts/{account_id}/cfd_tunnel")).query(&[("name", name), ("is_deleted", "false")]);
         let list: Vec<Tunnel> = self.send(req).await?;
         Ok(list.into_iter().find(|t| t.name == name))
     }
@@ -215,7 +244,9 @@ impl Cloudflare {
     }
 
     /// Create (or repoint) a proxied CNAME `hostname -> <tunnel_id>.cfargotunnel.com`.
-    /// Refuses to overwrite a record that is not a CNAME, so we never clobber someone's A record.
+    /// Only repoints a CNAME that TunnelPup created or that already points at this tunnel, and
+    /// refuses any other record, since removing the route later deletes it: someone's website
+    /// or their own tunnel setup must never be taken over.
     /// Also returns the CNAME it repointed, if any, so the change can be undone.
     pub async fn upsert_tunnel_cname(
         &self,
@@ -223,18 +254,24 @@ impl Cloudflare {
         hostname: &str,
         tunnel_id: &str,
     ) -> AppResult<(DnsRecord, Option<DnsRecord>)> {
+        let target = format!("{tunnel_id}.cfargotunnel.com");
         let body = json!({
             "type": "CNAME",
             "name": hostname,
-            "content": format!("{tunnel_id}.cfargotunnel.com"),
+            "content": &target,
             "proxied": true,
-            "comment": "Managed by TunnelPup",
+            "comment": MANAGED_COMMENT,
         });
         match self.find_dns_record(zone_id, hostname).await? {
-            Some(existing) if existing.record_type == "CNAME" => {
-                let rec = self.send(self.patch(&format!("/zones/{zone_id}/dns_records/{}", existing.id)).json(&body)).await?;
+            Some(existing) if existing.record_type == "CNAME" && managed_by_us(&existing, &target) => {
+                let rec =
+                    self.send(self.patch(&format!("/zones/{zone_id}/dns_records/{}", existing.id)).json(&body)).await?;
                 Ok((rec, Some(existing)))
             }
+            Some(existing) if existing.record_type == "CNAME" => Err(AppError::Invalid(format!(
+                "{hostname} already points to {}. TunnelPup only changes records it created: remove that record in Cloudflare first, or pick another name.",
+                existing.content
+            ))),
             Some(existing) => Err(AppError::Invalid(format!(
                 "{hostname} already has a {} record. Remove it in the Cloudflare dashboard first.",
                 existing.record_type
@@ -262,4 +299,45 @@ impl Cloudflare {
 
 fn truncate(s: &str, n: usize) -> String {
     if s.chars().count() <= n { s.to_string() } else { format!("{}…", s.chars().take(n).collect::<String>()) }
+}
+
+/// True for a CNAME TunnelPup may repoint: one it created, or one already aimed at `target`.
+fn managed_by_us(rec: &DnsRecord, target: &str) -> bool {
+    rec.comment.as_deref() == Some(MANAGED_COMMENT) || rec.content.trim_end_matches('.').eq_ignore_ascii_case(target)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cname(content: &str, comment: Option<&str>) -> DnsRecord {
+        DnsRecord {
+            id: "rec".into(),
+            name: "app.example.com".into(),
+            record_type: "CNAME".into(),
+            content: content.into(),
+            proxied: true,
+            comment: comment.map(Into::into),
+        }
+    }
+
+    #[test]
+    fn repoints_only_cnames_it_owns() {
+        let target = "29a6.cfargotunnel.com";
+        assert!(managed_by_us(&cname("29a6.cfargotunnel.com", None), target));
+        assert!(managed_by_us(&cname("29A6.cfargotunnel.com.", None), target));
+        assert!(managed_by_us(&cname("old-tunnel.cfargotunnel.com", Some(MANAGED_COMMENT)), target));
+        // Someone's website, and someone's own cloudflared setup.
+        assert!(!managed_by_us(&cname("cname.vercel-dns.com", None), target));
+        assert!(!managed_by_us(&cname("other-tunnel.cfargotunnel.com", Some("home server")), target));
+    }
+
+    #[test]
+    fn reads_how_many_pages_a_list_has() {
+        let list = r#"{"success":true,"errors":[],"result":[],"result_info":{"page":1,"per_page":50,"total_pages":3}}"#;
+        let env: Envelope<Vec<Value>> = serde_json::from_str(list).unwrap();
+        assert_eq!(env.result_info.map(|i| i.total_pages), Some(3));
+        let single: Envelope<Value> = serde_json::from_str(r#"{"success":true,"errors":[],"result":{}}"#).unwrap();
+        assert!(single.result_info.is_none());
+    }
 }

@@ -1,10 +1,10 @@
 # Code signing policy
 
-Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+Windows builds aren't code-signed yet. Free signing through [SignPath Foundation](https://signpath.org/)'s program for open-source projects is being set up; until then Windows shows a SmartScreen warning the first time you run the installer (More info → Run anyway).
 
 ## What gets signed
 
-Windows releases of TunnelPup are built from this repository by GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)) and signed through SignPath:
+Windows releases of TunnelPup are built from this repository by GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)). Once signing is set up, these are signed through SignPath:
 
 - `tunnelpup.exe`, the TunnelPup application
 - the installers: `TunnelPup_<version>_x64-setup.exe` and `TunnelPup_<version>_x64_en-US.msi`
@@ -16,7 +16,7 @@ TunnelPup also ships Cloudflare's tunnel connector, cloudflared, as `tunnelpup-c
 - Committers and reviewers: [Mayank Jonwal](https://github.com/mayankjonwal02)
 - Approvers: [Mayank Jonwal](https://github.com/mayankjonwal02)
 
-Every release signing request is approved manually by an approver.
+Every release signing request will be approved manually by an approver.
 
 ## Privacy policy
 

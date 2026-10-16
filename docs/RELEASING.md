@@ -17,6 +17,21 @@ Installers are built by GitHub Actions ([`.github/workflows/release.yml`](../.gi
 
 To try installers locally, `npm run tauri build` builds the ones for your own system into `src-tauri/target/release/bundle/`.
 
+Each build job also gathers the licence notices of every Rust crate and npm package the app is built from (`npm run licenses`, using [cargo-about](https://github.com/EmbarkStudios/cargo-about)), which the app shows under **Settings → Open-source licenses**. A dependency under a licence that `src-tauri/about.toml` doesn't accept stops the build, and CI flags it on the pull request that adds it.
+
+To ship a newer cloudflared, change `CLOUDFLARED_VERSION` in `scripts/fetch-cloudflared.mjs` and `src-tauri/src/lib.rs`, and update the `SHA256` values in the script: GitHub shows each file's SHA-256 on the cloudflared release page. Check them against the checksums in Cloudflare's release notes, which for the macOS `.tgz` files are for the binary inside. A download that doesn't match is never used.
+
+## Updates
+
+The app's **Check for updates** reads `latest.json` from the latest release and installs an update only if it's signed with TunnelPup's update key. Release builds make the signed update files and `latest.json` through `src-tauri/tauri.release.conf.json`; local builds don't, so they don't need the key.
+
+The key pair is made once, with `npx tauri signer generate -w "$env:USERPROFILE\.tauri\tunnelpup.key"`:
+
+- the public key is `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`;
+- the private key and its password are the repository secrets `TAURI_SIGNING_PRIVATE_KEY` (the whole `.key` file) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+
+Keep a backup of the private key and its password. Without them no update can ever be signed again, and everyone would have to reinstall by hand.
+
 ## Code signing
 
 - **macOS:** builds are ad-hoc signed, so users open the app with right-click → **Open** the first time. Removing that step needs the Apple Developer Program (notarization).
@@ -64,6 +79,8 @@ The repository already meets the requirements: an OSI licence ([MIT](../LICENSE)
 5. In this repository's **Settings → Secrets and variables → Actions**, add:
    - secret `SIGNPATH_API_TOKEN` (a SignPath user with submitter rights),
    - variables `SIGNPATH_ORGANIZATION_ID` and `SIGNPATH_PROJECT_SLUG` (and `SIGNPATH_SIGNING_POLICY_SLUG` if it isn't `release-signing`).
+6. Change the first line of [CODE_SIGNING_POLICY.md](../CODE_SIGNING_POLICY.md) to the wording SignPath asks for: "Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/)."
+7. Make the signed Windows path produce update files too. It doesn't yet, so signed Windows installs wouldn't see updates. After SignPath signs the installers, sign each one for the updater with `npx tauri signer sign` (with the same two secrets), attach the `.sig` files, and add the Windows entries to the release's `latest.json`. Doing it earlier wouldn't work, because SignPath's signature changes the files.
 
 From the next release on, the Windows job builds `tunnelpup.exe`, has SignPath sign it, packages the installers around the signed exe, has SignPath sign the installers, checks the signatures and attaches them. Each release waits (up to an hour) for you to approve the two signing requests in SignPath.
 
