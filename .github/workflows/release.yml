@@ -119,14 +119,24 @@ jobs:
       - run: npm ci
       - run: node scripts/fetch-cloudflared.mjs --target ${{ matrix.target }}
 
+      # The licence notices shown under Settings → Open-source licenses.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+      - run: npm run licenses
+
       # ---- Unsigned path (macOS, Linux, and Windows until SignPath is set up) ----
 
+      # tauri.release.conf.json adds the signed update files the in-app updater downloads.
       - name: Build and upload installers
         if: env.SIGN_WINDOWS != 'true'
         uses: tauri-apps/tauri-action@v1
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ env.RELEASE_ID }}
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} --config src-tauri/tauri.release.conf.json
 
       # ---- Signed Windows path (SignPath) ----
       # Sign tunnelpup.exe first, then build the installers around it, then sign the installers.

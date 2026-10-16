@@ -119,8 +119,8 @@ mod win {
 
     use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
     use windows_sys::Win32::System::JobObjects::{
-        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-        JobObjectExtendedLimitInformation, SetInformationJobObject,
+        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation, SetInformationJobObject,
     };
     use windows_sys::Win32::System::Threading::{
         OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA, PROCESS_TERMINATE,
@@ -233,7 +233,11 @@ mod tests {
 
     #[test]
     fn recognises_only_tunnelpups_connector() {
-        for yes in ["tunnelpup-cloudflared.exe", "C:/Program Files/TunnelPup/tunnelpup-cloudflared.exe", "/usr/bin/tunnelpup-cloudflared"] {
+        for yes in [
+            "tunnelpup-cloudflared.exe",
+            "C:/Program Files/TunnelPup/tunnelpup-cloudflared.exe",
+            "/usr/bin/tunnelpup-cloudflared",
+        ] {
             assert!(is_connector(Path::new(yes)), "{yes}");
         }
         for no in ["cloudflared.exe", "/usr/bin/cloudflared", "tunnelpup.exe", "tunnelpup-cloudflared-helper"] {

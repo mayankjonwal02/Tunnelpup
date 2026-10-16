@@ -6,7 +6,6 @@ mod doh;
 mod error;
 mod freedomain;
 mod guard;
-mod migrate;
 mod ports;
 mod secrets;
 mod tray;
@@ -37,8 +36,6 @@ pub fn run() {
         .manage(RouteLock(tokio::sync::Mutex::new(())))
         .setup(|app| {
             let handle = app.handle().clone();
-            // First start after the rename from PortHop: take over its settings and token.
-            migrate::from_porthop(&handle);
             // A connector left behind by a TunnelPup that crashed or was killed.
             guard::kill_leftover(&handle);
             let cfg = config::load(&handle);
@@ -46,10 +43,10 @@ pub fn run() {
             tray::create(app)?;
 
             // Launched by autostart: stay in the tray.
-            if std::env::args().any(|a| a == "--minimized") {
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.hide();
-                }
+            if std::env::args().any(|a| a == "--minimized")
+                && let Some(w) = app.get_webview_window("main")
+            {
+                let _ = w.hide();
             }
 
             // Bring the tunnel back up after a reboot / relaunch.

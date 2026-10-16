@@ -39,6 +39,7 @@
     ],
     "category": "DeveloperTool",
     "publisher": "Mayank Jonwal",
+    "copyright": "Copyright © 2026 Mayank Jonwal",
     "license": "MIT",
     "homepage": "https://github.com/mayankjonwal02/Tunnelpup",
     "shortDescription": "localhost:3000 \u2192 app.yourdomain.com in one hop",
@@ -56,7 +57,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "REPLACE_WITH_OUTPUT_OF_tauri_signer_generate",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFENkIyQ0VFRjM0MDI0MkEKUldRcUpFRHo3aXhycllBUlduczVtUnBZckk0VHE2MGRVQkNnM0c4SnhKeXMxM1NpQW41Snlwa2oK",
       "endpoints": [
         "https://github.com/mayankjonwal02/Tunnelpup/releases/latest/download/latest.json"
       ],

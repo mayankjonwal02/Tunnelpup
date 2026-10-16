@@ -55,7 +55,7 @@ Type a name, choose a domain and the port your app runs on. TunnelPup checks the
 
 <p align="center"><img src="docs/screenshots/route-added.png" width="680" alt="A new route, chat.example.com, has just been added and the form shows it is live with a Copy link button" /></p>
 
-- **Common dev-server ports that are listening right now** are suggested as one-click chips.
+- **Apps already running on your computer** (on common dev-server ports) are suggested as one-click chips.
 - **Apps that only answer to `localhost`** (Ollama, Vite, Django, Rails…) are detected automatically; TunnelPup has the tunnel send them `Host: localhost` and tags the route.
 - **Change a port** by editing the number; **remove** a route and its DNS record goes with it.
 
@@ -149,6 +149,7 @@ Free domains have to be renewed on DigitalPlat (for free) before they expire.
 | Cloudflare error 1033 or HTTP 530 | The tunnel isn't connected. Check the status at the top, press **Start**, and look in **Logs** for the reason. |
 | A domain stays "Waiting for HTTPS certificate" | Cloudflare issues it after the nameservers are set, usually within 15 minutes to a few hours. |
 | A token or permission error | TunnelPup needs Cloudflare Tunnel: Edit, Account Settings: Read, DNS: Edit and Zone: Edit, for all zones. Edit the token in Cloudflare and paste it again. |
+| "… already points to …" when adding a route | That name already has a DNS record TunnelPup didn't create, such as your website. TunnelPup won't take it over: pick another name, or delete the record in Cloudflare if you no longer need it. |
 
 The in-app **Guide** has the same answers, plus more detail.
 
@@ -158,6 +159,7 @@ The in-app **Guide** has the same answers, plus more detail.
 - **Your API token stays on your computer**, in the system keychain (Windows Credential Manager, macOS Keychain, or the Secret Service on Linux), and is only ever sent to Cloudflare. Signing out removes it.
 - **No analytics or telemetry.** TunnelPup talks to Cloudflare (to manage and serve your routes), to public DNS resolvers from Cloudflare and Google (to check your routes and domains work), and to DigitalPlat's nameservers (only when you check a free domain name). See the [privacy section of the code signing policy](CODE_SIGNING_POLICY.md#privacy-policy).
 - **The connector ends with TunnelPup.** On Windows it ends the moment TunnelPup does, even after a crash or a force-close; on macOS and Linux a leftover connector is ended the next time TunnelPup starts. Either way your sites don't quietly stay online without TunnelPup.
+- **Updates are signed.** **Settings → Check for updates** installs only releases signed with TunnelPup's update key.
 - **Found a security problem?** Please report it privately; see [SECURITY.md](SECURITY.md).
 
 ## FAQ
@@ -168,7 +170,7 @@ The in-app **Guide** has the same answers, plus more detail.
 
 **Can I use several computers?** Yes. Each computer gets its own tunnel, named after the computer.
 
-**I already use `cloudflared` myself. Will TunnelPup interfere?** No. TunnelPup runs its own copy, named `tunnelpup-cloudflared`, with its own tunnel, so your existing setup is left alone.
+**I already use `cloudflared` myself. Will TunnelPup interfere?** No. TunnelPup runs its own copy, named `tunnelpup-cloudflared`, with its own tunnel, and never takes over a DNS record it didn't create, so your existing setup is left alone.
 
 **Which apps can I share?** Anything that serves HTTP on your computer: dev servers, dashboards, self-hosted tools, local AI models. TunnelPup forwards to `http://localhost:<port>`.
 
@@ -182,7 +184,7 @@ npm run tauri dev    # run the app in development
 npm run tauri build  # build installers into src-tauri/target/release/bundle/
 ```
 
-Tests: `npx tsc --noEmit` for the interface and `cargo test` in `src-tauri/` for the core; `cargo test -- --include-ignored` also runs the tests that talk to Cloudflare and DigitalPlat.
+Checks: `npm run build` type-checks and builds the interface; in `src-tauri/`, run `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test`. The tests that talk to Cloudflare and DigitalPlat need a DigitalPlat domain that's active on Cloudflare: `TUNNELPUP_TEST_DOMAIN=yourname.dpdns.org cargo test -- --include-ignored`.
 
 <details>
 <summary><strong>How the code is organised</strong></summary>
@@ -199,10 +201,11 @@ Tests: `npx tsc --noEmit` for the interface and `cargo test` in `src-tauri/` for
 | `src-tauri/src/verify.rs` | End-to-end route checks, HTTPS certificate checks, `localhost`-only app detection |
 | `src-tauri/src/freedomain.rs` | Free-domain availability checks against DigitalPlat's nameservers |
 | `src-tauri/src/doh.rs` | DNS-over-HTTPS lookups that bypass stale local caches |
-| `src-tauri/src/ports.rs` | Finds which local ports have something listening |
+| `src-tauri/src/ports.rs` | Suggests apps already running on this computer |
 | `src-tauri/src/secrets.rs` | Stores the API token in the system keychain |
 | `src-tauri/src/tray.rs` | Tray icon and menu |
-| `scripts/fetch-cloudflared.mjs` | Downloads and verifies the connector for each platform |
+| `scripts/fetch-cloudflared.mjs` | Downloads the connector for each platform and checks it against pinned SHA-256 values |
+| `scripts/licenses.mjs` | Gathers the licence notices shown under Settings → Open-source licenses |
 
 </details>
 
@@ -210,7 +213,7 @@ Installers for every system are built by GitHub Actions; see [docs/RELEASING.md]
 
 ## Contributing
 
-Issues and pull requests are welcome. Before opening a pull request, please run `npx tsc --noEmit` and `cargo test`, and keep the interface text plain and specific: say what happened and what to do next.
+Issues and pull requests are welcome. CI runs the checks above on Linux and Windows for every pull request; running them first saves a round trip. Please keep the interface text plain and specific: say what happened and what to do next.
 
 ## Code signing policy
 

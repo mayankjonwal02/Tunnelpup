@@ -62,10 +62,8 @@ async fn check(hostname: &str, port: u16) -> Result<(), String> {
 /// localhost and refuse any other Host. True if the app on `port` refuses `hostname`
 /// but answers localhost, so the tunnel should send it `Host: localhost` instead.
 pub async fn rejects_public_host(hostname: &str, port: u16) -> bool {
-    let Ok(client) = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_secs(5))
-        .build()
+    let Ok(client) =
+        reqwest::Client::builder().redirect(reqwest::redirect::Policy::none()).timeout(Duration::from_secs(5)).build()
     else {
         return false;
     };
@@ -160,16 +158,22 @@ mod tests {
         let needs_login = serve(|_| "403 Forbidden");
         tauri::async_runtime::block_on(async {
             assert!(!rejects_public_host("app.example.com", any_host).await);
-            assert!(!rejects_public_host("app.example.com", needs_login).await, "a 403 for everyone isn't about the Host");
+            assert!(
+                !rejects_public_host("app.example.com", needs_login).await,
+                "a 403 for everyone isn't about the Host"
+            );
         });
     }
 
-    /// Talks to Cloudflare. Run with `cargo test -- --ignored`.
+    /// Talks to Cloudflare. Run with
+    /// `TUNNELPUP_TEST_DOMAIN=<a DigitalPlat domain on Cloudflare> cargo test -- --ignored`.
     #[test]
     #[ignore]
     fn live_certificate_check() {
+        let domain = std::env::var("TUNNELPUP_TEST_DOMAIN")
+            .expect("set TUNNELPUP_TEST_DOMAIN to a DigitalPlat domain that's active on Cloudflare");
         tauri::async_runtime::block_on(async {
-            assert_eq!(certificate("dataai.dpdns.org").await, CertStatus::Ready);
+            assert_eq!(certificate(&domain).await, CertStatus::Ready);
             // A DigitalPlat name that isn't on Cloudflare at all, so it has no certificate there.
             assert_eq!(certificate("tunnelpup-not-a-zone-7q.dpdns.org").await, CertStatus::Pending);
         });

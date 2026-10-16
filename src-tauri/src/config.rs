@@ -41,20 +41,14 @@ pub struct Route {
     pub rewrite_host: bool,
 }
 
-pub const FILE: &str = "config.json";
-
 fn path(app: &AppHandle) -> AppResult<PathBuf> {
     let dir = app.path().app_config_dir()?;
     std::fs::create_dir_all(&dir)?;
-    Ok(dir.join(FILE))
+    Ok(dir.join("config.json"))
 }
 
 pub fn load(app: &AppHandle) -> AppConfig {
-    path(app)
-        .ok()
-        .and_then(|p| std::fs::read(p).ok())
-        .and_then(|b| serde_json::from_slice(&b).ok())
-        .unwrap_or_default()
+    path(app).ok().and_then(|p| std::fs::read(p).ok()).and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
 }
 
 pub fn save(app: &AppHandle, cfg: &AppConfig) -> AppResult<()> {

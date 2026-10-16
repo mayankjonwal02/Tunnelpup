@@ -1,0 +1,15 @@
+Rust crates
+===========
+
+TunnelPup is built from these Rust crates. The source code of each one, including those under
+the Mozilla Public License 2.0, is available from crates.io: https://crates.io/crates/<name>
+{{#each licenses}}
+
+--------------------------------------------------------------------------------
+{{{name}}}, used by:
+{{#each used_by}}
+  {{{crate.name}}} {{{crate.version}}}{{#if crate.repository}} ({{{crate.repository}}}){{/if}}
+{{/each}}
+
+{{{text}}}
+{{/each}}

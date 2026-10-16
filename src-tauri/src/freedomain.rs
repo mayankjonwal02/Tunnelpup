@@ -18,7 +18,8 @@ pub const SUFFIXES: &[&str] = &["dpdns.org", "us.kg", "qzz.io", "xx.kg"];
 
 /// DigitalPlat's main nameservers. They answer for every suffix, including qzz.io,
 /// whose own listed servers refuse queries.
-const DIGITALPLAT_NS: &[&str] = &["ns1.digitalplat.org", "ns2.digitalplat.org", "ns3.digitalplat.org", "ns4.digitalplat.org"];
+const DIGITALPLAT_NS: &[&str] =
+    &["ns1.digitalplat.org", "ns2.digitalplat.org", "ns3.digitalplat.org", "ns4.digitalplat.org"];
 
 const ANSWER_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -115,12 +116,15 @@ mod tests {
         assert_eq!(rcode(&reply[..5], 7), None, "truncated");
     }
 
-    /// Talks to DigitalPlat's nameservers. Run with `cargo test -- --ignored`.
+    /// Talks to DigitalPlat's nameservers. Run with
+    /// `TUNNELPUP_TEST_DOMAIN=<a DigitalPlat domain on Cloudflare> cargo test -- --ignored`.
     #[test]
     #[ignore]
     fn live_lookup() {
+        let domain = std::env::var("TUNNELPUP_TEST_DOMAIN")
+            .expect("set TUNNELPUP_TEST_DOMAIN to a DigitalPlat domain that's active on Cloudflare");
         tauri::async_runtime::block_on(async {
-            assert_eq!(check("dataai.dpdns.org").await, Availability::Taken);
+            assert_eq!(check(&domain).await, Availability::Taken);
             for s in SUFFIXES {
                 assert_eq!(check(&format!("tunnelpup-test-unregistered-7q.{s}")).await, Availability::Available, "{s}");
             }

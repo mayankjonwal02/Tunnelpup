@@ -1,0 +1,28 @@
+# Weekly dependency updates. Minor and patch updates come as one pull request per ecosystem;
+# CI checks each one. The npm @tauri-apps/* packages must stay on the same minor version as the
+# matching Rust crates, or the build stops with a version mismatch.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    groups:
+      rust:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

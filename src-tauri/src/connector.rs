@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 
 use crate::error::{AppError, AppResult};
 use crate::guard;
@@ -155,8 +155,7 @@ async fn supervise(app: AppHandle, token: String, generation: u64) {
                         connections += 1;
                         backoff = 2;
                         set_status(&app, ConnectorStatus::Connected { connections });
-                    } else if line.contains("Unregistered tunnel connection")
-                        || line.contains("Connection terminated")
+                    } else if line.contains("Unregistered tunnel connection") || line.contains("Connection terminated")
                     {
                         connections = connections.saturating_sub(1);
                         if connections > 0 {

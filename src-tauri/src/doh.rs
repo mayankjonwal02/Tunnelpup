@@ -48,7 +48,8 @@ struct Reply {
 pub async fn records(name: &str, kind: RecordType) -> Option<Vec<String>> {
     let http = reqwest::Client::builder().timeout(Duration::from_secs(5)).build().ok()?;
     for url in DOH {
-        let req = http.get(*url).query(&[("name", name), ("type", kind.name())]).header("accept", "application/dns-json");
+        let req =
+            http.get(*url).query(&[("name", name), ("type", kind.name())]).header("accept", "application/dns-json");
         let Ok(res) = req.send().await else { continue };
         let Ok(reply) = res.json::<Reply>().await else { continue };
         let found: Vec<String> = reply.answer.into_iter().filter(|a| a.kind == kind.code()).map(|a| a.data).collect();

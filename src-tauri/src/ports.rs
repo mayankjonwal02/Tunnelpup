@@ -1,13 +1,13 @@
-//! Suggests local ports that currently have something listening, by probing
-//! common dev-server ports on loopback. Cheap and needs no elevated rights.
+//! Suggests apps already running on this computer, by checking which of the common
+//! dev-server ports have something listening on loopback. Never looks beyond this computer.
 
 use std::time::Duration;
 
 use tokio::net::TcpStream;
 
 const COMMON_PORTS: &[u16] = &[
-    80, 1313, 3000, 3001, 3002, 3333, 4000, 4200, 4321, 5000, 5001, 5173, 5174, 5500, 6006, 7000,
-    8000, 8001, 8080, 8081, 8088, 8443, 8787, 8888, 9000, 9090,
+    80, 1313, 3000, 3001, 3002, 3333, 4000, 4200, 4321, 5000, 5001, 5173, 5174, 5500, 6006, 7000, 8000, 8001, 8080,
+    8081, 8088, 8443, 8787, 8888, 9000, 9090,
 ];
 
 /// True if something accepts connections on `port` over IPv4 or IPv6 loopback.
