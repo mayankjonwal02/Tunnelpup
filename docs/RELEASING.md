@@ -12,8 +12,8 @@ Installers are built by GitHub Actions ([`.github/workflows/release.yml`](../.gi
 ## Making a release
 
 1. Set the new version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`.
-2. Commit, then either push a tag (`git tag v0.2.0 && git push origin v0.2.0`) or run **Actions → Release → Run workflow**.
-3. When all jobs are green, open **Releases**, check the draft, and publish it. Each run starts the draft over, with the notes from `.github/release-notes.md`, so make any edits to the draft after the last run.
+2. Merge that into `main` through a pull request, then run **Actions → Release → Run workflow**.
+3. When all jobs are green, open **Releases**, check the draft, and publish it. Publishing creates the version tag (`v0.2.0`); don't push one yourself. Each run starts the draft over, with the notes from `.github/release-notes.md`, so make any edits to the draft after the last run.
 
 To try installers locally, `npm run tauri build` builds the ones for your own system into `src-tauri/target/release/bundle/`.
 
