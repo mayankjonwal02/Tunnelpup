@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://tunnelpup.vercel.app"><img src="https://img.shields.io/badge/website-tunnelpup.vercel.app-F06A12" alt="Website: tunnelpup.vercel.app" /></a>
   <a href="https://github.com/mayankjonwal02/Tunnelpup/releases/latest"><img src="https://img.shields.io/github/v/release/mayankjonwal02/Tunnelpup?include_prereleases&label=download" alt="Latest release" /></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-informational" alt="Windows, macOS and Linux" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT licence" /></a>
@@ -20,7 +21,9 @@
   <img src="docs/screenshots/dashboard.png" width="760" alt="TunnelPup's main screen: four routes, each mapping a subdomain of example.com to a local port, with the tunnel shown as Live" />
 </p>
 
-TunnelPup is a desktop app that gives the apps on your computer real public addresses on a domain you own. Pick a subdomain, pick a port, and TunnelPup sets up the Cloudflare Tunnel routing and DNS for you, then checks the link actually loads before it shows it to you. It runs quietly in the system tray, reconnects on its own, and tells you plainly when something needs your attention.
+TunnelPup is a free, open-source desktop app for Cloudflare Tunnel that gives the apps on your computer real public addresses on a domain you own. Pick a subdomain, pick a port, and TunnelPup sets up the Cloudflare Tunnel routing and DNS for you, then checks the link actually loads before it shows it to you. It runs quietly in the system tray, reconnects on its own, and tells you plainly when something needs your attention.
+
+**Website:** [tunnelpup.vercel.app](https://tunnelpup.vercel.app)
 
 ## Contents
 
@@ -45,7 +48,7 @@ TunnelPup is a desktop app that gives the apps on your computer real public addr
 - **Nothing to open on your router.** Your computer only makes outgoing connections to Cloudflare, and your home IP address stays private.
 - **HTTPS out of the box.** Cloudflare's free certificate covers `yourdomain.com` and names like `app.yourdomain.com`; TunnelPup waits until it's issued before it lets you use a new domain.
 - **It checks its own work.** A route only appears once TunnelPup has confirmed `https://…` loads through Cloudflare, and every route shows *App not running* if the app behind it stops.
-- **A real app, not a config file.** No YAML, no command line: point, click, share.
+- **A real app, not a config file.** A desktop GUI for Cloudflare Tunnel: no YAML, no `cloudflared` commands. Point, click, share.
 
 ## Features
 
@@ -165,6 +168,10 @@ The in-app **Guide** has the same answers, plus more detail.
 ## FAQ
 
 **Is it free?** TunnelPup is free and open source (MIT). Cloudflare Tunnel is free on Cloudflare's free plan. You need a domain, either one you own or a free one from DigitalPlat.
+
+**How is it different from ngrok or Cloudflare's quick tunnels?** It does the same job of putting an app on your computer on the internet, but on a domain you own. Your links keep the same address every time you start TunnelPup, so you can bookmark them, send them to clients and put them in a README.
+
+**Do I need to use `cloudflared` on the command line?** No. TunnelPup bundles `cloudflared`, creates the tunnel, routing rules and DNS records through Cloudflare's API, and runs the connector for you. You never type a command or edit a config file.
 
 **Does my computer need to stay on?** Yes. Your routes are served from your computer, so they're online while it's on and TunnelPup is running.
 
