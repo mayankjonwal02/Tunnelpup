@@ -32,12 +32,12 @@ jobs:
     outputs:
       release-id: ${{ steps.release.outputs.result }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # One draft for all jobs to upload into. Each run starts it over, so it holds only this
       # run's commit, notes and installers; re-running just the failed jobs keeps it.
       - id: release
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -92,7 +92,7 @@ jobs:
       # "true" only for the Windows job, once SignPath is set up.
       SIGN_WINDOWS: ${{ matrix.os == 'windows-latest' && vars.SIGNPATH_ORGANIZATION_ID != '' && vars.SIGNPATH_PROJECT_SLUG != '' && secrets.SIGNPATH_API_TOKEN != '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Linux build dependencies
         if: runner.os == 'Linux'
@@ -100,7 +100,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libdbus-1-dev pkg-config
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -148,7 +148,7 @@ jobs:
       - name: Upload tunnelpup.exe for signing
         if: env.SIGN_WINDOWS == 'true'
         id: unsigned-exe
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tunnelpup-exe-unsigned
           path: ${{ env.BUILD_DIR }}/tunnelpup.exe
@@ -181,7 +181,7 @@ jobs:
       - name: Upload installers for signing
         if: env.SIGN_WINDOWS == 'true'
         id: unsigned-installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: installers-unsigned
           path: unsigned/installers/
@@ -214,7 +214,7 @@ jobs:
 
       - name: Attach the signed installers to the release
         if: env.SIGN_WINDOWS == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
