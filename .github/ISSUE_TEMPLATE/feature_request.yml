@@ -1,0 +1,25 @@
+name: Feature request
+description: Something TunnelPup should do that it doesn't yet.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The situation and what gets in the way today. A real example helps more than a proposed solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: How you'd like it to work, if you have an idea.
+  - type: dropdown
+    id: os
+    attributes:
+      label: System
+      options:
+        - Windows 10/11
+        - macOS
+        - Linux
+        - All of them

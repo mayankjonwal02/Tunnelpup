@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or idea
+    url: https://github.com/mayankjonwal02/Tunnelpup/discussions
+    about: Ask how to do something, or share an idea before it becomes a feature request.
+  - name: Security problem
+    url: https://github.com/mayankjonwal02/Tunnelpup/security/advisories/new
+    about: Report it privately instead of in a public issue.
