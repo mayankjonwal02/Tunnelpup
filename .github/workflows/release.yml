@@ -234,3 +234,11 @@ jobs:
               });
               core.info(`Attached ${name}`);
             }
+
+  # SHA256SUMS.txt for everything the build jobs attached (see checksums.yml).
+  checksums:
+    name: Checksums
+    needs: [create-release, build]
+    uses: ./.github/workflows/checksums.yml
+    with:
+      release-id: ${{ needs.create-release.outputs.release-id }}

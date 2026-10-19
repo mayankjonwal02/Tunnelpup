@@ -229,7 +229,7 @@ Installers for every system are built by GitHub Actions; see [docs/RELEASING.md]
 
 ## Contributing
 
-Issues and pull requests are welcome. CI runs the checks above on Linux and Windows for every pull request; running them first saves a round trip. Please keep the interface text plain and specific: say what happened and what to do next.
+Issues and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks and what makes a pull request easy to merge. Issues labelled [`good first issue`](https://github.com/mayankjonwal02/Tunnelpup/labels/good%20first%20issue) are a good place to start, and questions and ideas go in [Discussions](https://github.com/mayankjonwal02/Tunnelpup/discussions).
 
 ## Code signing policy
 

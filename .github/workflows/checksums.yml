@@ -1,0 +1,88 @@
+# Attaches SHA256SUMS.txt to a release: one SHA-256 per installer and update bundle, so people can
+# check a download with `sha256sum -c SHA256SUMS.txt --ignore-missing` (Linux) or
+# `shasum -a 256 -c SHA256SUMS.txt --ignore-missing` (macOS).
+#
+# The Release workflow calls this after every build job has uploaded. To add or refresh the file on
+# a release that already exists, run it from the Actions tab ("Checksums" → "Run workflow") with
+# the tag, for example v0.1.0. An existing SHA256SUMS.txt is replaced.
+
+name: Checksums
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example v0.1.0
+        required: true
+  workflow_call:
+    inputs:
+      release-id:
+        description: ID of the (draft) release to attach the checksums to
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  checksums:
+    name: SHA256SUMS.txt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v9
+        env:
+          TAG: ${{ inputs.tag }}
+          RELEASE_ID: ${{ inputs.release-id }}
+        with:
+          script: |
+            const crypto = require('crypto');
+            const NAME = 'SHA256SUMS.txt';
+
+            // Drafts can't be fetched by tag, so the Release workflow passes the ID instead.
+            const release = process.env.RELEASE_ID
+              ? (await github.rest.repos.getRelease({ ...context.repo, release_id: Number(process.env.RELEASE_ID) })).data
+              : (await github.rest.repos.getReleaseByTag({ ...context.repo, tag: process.env.TAG })).data;
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, { ...context.repo, release_id: release.id });
+
+            // Installers and update bundles; the updater's .sig files and latest.json are covered by its own signature.
+            const files = assets
+              .filter((a) => a.name !== NAME && !/\.sig$|\.json$/i.test(a.name))
+              .sort((a, b) => a.name.localeCompare(b.name));
+            if (!files.length) {
+              core.setFailed(`${release.tag_name} has no installers to checksum.`);
+              return;
+            }
+
+            const lines = [];
+            for (const a of files) {
+              const { data } = await github.rest.repos.getReleaseAsset({
+                ...context.repo,
+                asset_id: a.id,
+                headers: { accept: 'application/octet-stream' },
+              });
+              const buf = Buffer.from(data);
+              if (buf.length !== a.size) {
+                core.setFailed(`${a.name}: downloaded ${buf.length} bytes, expected ${a.size}.`);
+                return;
+              }
+              const sum = crypto.createHash('sha256').update(buf).digest('hex');
+              // GitHub records its own digest for newer uploads; a mismatch means something is wrong.
+              if (a.digest && a.digest !== `sha256:${sum}`) {
+                core.setFailed(`${a.name}: computed ${sum}, but GitHub lists ${a.digest}.`);
+                return;
+              }
+              lines.push(`${sum}  ${a.name}`);
+              core.info(`${sum}  ${a.name}`);
+            }
+            const body = Buffer.from(lines.join('\n') + '\n');
+
+            const old = assets.find((a) => a.name === NAME);
+            if (old) await github.rest.repos.deleteReleaseAsset({ ...context.repo, asset_id: old.id });
+            await github.rest.repos.uploadReleaseAsset({
+              ...context.repo,
+              release_id: release.id,
+              name: NAME,
+              data: body,
+              headers: { 'content-type': 'text/plain', 'content-length': body.length },
+            });
+            core.notice(`Attached ${NAME} (${files.length} files) to ${release.tag_name}.`);

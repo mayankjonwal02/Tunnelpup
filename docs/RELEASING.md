@@ -15,6 +15,8 @@ Installers are built by GitHub Actions ([`.github/workflows/release.yml`](../.gi
 2. Merge that into `main` through a pull request, then run **Actions → Release → Run workflow**.
 3. When all jobs are green, open **Releases**, check the draft, and publish it. Publishing creates the version tag (`v0.2.0`); don't push one yourself. Each run starts the draft over, with the notes from `.github/release-notes.md`, so make any edits to the draft after the last run.
 
+A last job, **Checksums** ([`.github/workflows/checksums.yml`](../.github/workflows/checksums.yml)), attaches `SHA256SUMS.txt` with the SHA-256 of every installer and update bundle. If you replace a file on a release by hand, run **Actions → Checksums → Run workflow** with the tag to refresh it.
+
 To try installers locally, `npm run tauri build` builds the ones for your own system into `src-tauri/target/release/bundle/`.
 
 Each build job also gathers the licence notices of every Rust crate and npm package the app is built from (`npm run licenses`, using [cargo-about](https://github.com/EmbarkStudios/cargo-about)), which the app shows under **Settings → Open-source licenses**. A dependency under a licence that `src-tauri/about.toml` doesn't accept stops the build, and CI flags it on the pull request that adds it.
