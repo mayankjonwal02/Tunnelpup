@@ -1,6 +1,8 @@
 export const ptBR = {
+  general: {
+    loading: "Carregando…",
+  },
   setup: {
-    title: "TunnelPup",
     description: "Disponibilize localhost:3000 em app.yourdomain.com pela Cloudflare.",
     readGuide: "Primeira vez aqui? Leia o guia",
     connectAccount: "Conecte sua conta da Cloudflare",

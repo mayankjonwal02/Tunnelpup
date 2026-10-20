@@ -1,6 +1,8 @@
 export const en = {
+  general: {
+    loading: "Loading…",
+  },
   setup: {
-    title: "TunnelPup",
     description: "Put localhost:3000 on app.yourdomain.com, through Cloudflare.",
     readGuide: "New here? Read the guide",
     connectAccount: "Connect your Cloudflare account",
