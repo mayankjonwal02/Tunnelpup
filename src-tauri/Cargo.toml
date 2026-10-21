@@ -1,6 +1,6 @@
 [package]
 name = "tunnelpup"
-version = "0.1.0"
+version = "0.2.0"
 description = "Expose a local port on your own domain through a Cloudflare Tunnel"
 authors = ["Mayank Jonwal"]
 license = "MIT"
